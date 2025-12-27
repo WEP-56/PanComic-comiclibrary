@@ -13,8 +13,8 @@
 
 ## 📸 截图
 
-![示例图片](https://raw.githubusercontent.com/WEP-56/PanComic-comiclibrary/master/example1.png)
-![示例图片](https://raw.githubusercontent.com/WEP-56/PanComic-comiclibrary/master/example2.png)
+![示例图片](example1.png)
+![示例图片](example2.png)
 
 ## 🚀 快速开始
 
