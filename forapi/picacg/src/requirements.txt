@@ -1,0 +1,17 @@
+PySide6==6.5.3
+websocket-client==0.59.0
+sr-vulkan
+sr-vulkan-model-waifu2x
+sr-vulkan-model-realcugan
+sr-vulkan-model-realesrgan
+pillow
+Pysocks
+natsort
+webdavclient3
+tqdm
+pysmb
+lxml
+httpx
+httpx[http2]
+httpx[socks]
+psutil>=5.9.0  # 性能监控（可选）

@@ -1,0 +1,1 @@
+"""JMComic-qt project integration."""

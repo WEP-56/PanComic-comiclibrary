@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Build
+*.spec
+build/
+dist/
+*.egg-info/
+
+# Downloads & Data
+downloads/
+*.json
+
+# Logs
+*.log
+logs/
+
+# Virtual Environment
+venv/
+.venv/
+env/

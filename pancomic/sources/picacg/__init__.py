@@ -1,0 +1,1 @@
+"""PicACG-qt project integration."""
