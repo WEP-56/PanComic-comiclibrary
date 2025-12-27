@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
     def _setup_ui(self) -> None:
         """Initialize UI components and layout."""
         # Set window properties
-        self.setWindowTitle("PanComic - 多源漫画阅读器")
+        self.setWindowTitle("你好喵o(=•ェ•=)m")
         
         # Set default window size (1400x900)
         window_width = self.config_manager.get('general.window_size.width', 1400)
