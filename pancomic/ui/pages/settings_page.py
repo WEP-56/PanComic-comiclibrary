@@ -14,6 +14,7 @@ from pancomic.core.config_manager import ConfigManager
 from pancomic.adapters.picacg_adapter import PicACGAdapter
 from pancomic.adapters.jmcomic_adapter import JMComicAdapter
 from pancomic.adapters.ehentai_adapter import EHentaiAdapter
+from pancomic.adapters.wnacg_adapter import WNACGAdapter
 
 
 class SettingsPage(QWidget):
@@ -31,6 +32,7 @@ class SettingsPage(QWidget):
                  picacg_adapter: Optional[PicACGAdapter] = None,
                  jmcomic_adapter: Optional[JMComicAdapter] = None,
                  ehentai_adapter: Optional[EHentaiAdapter] = None,
+                 wnacg_adapter: Optional[WNACGAdapter] = None,
                  parent: Optional[QWidget] = None):
         """
         初始化设置页面
@@ -40,6 +42,7 @@ class SettingsPage(QWidget):
             picacg_adapter: PicACG适配器
             jmcomic_adapter: JMComic适配器  
             ehentai_adapter: EHentai适配器
+            wnacg_adapter: WNACG适配器
             parent: 父窗口
         """
         super().__init__(parent)
@@ -48,6 +51,7 @@ class SettingsPage(QWidget):
         self.picacg_adapter = picacg_adapter
         self.jmcomic_adapter = jmcomic_adapter
         self.ehentai_adapter = ehentai_adapter
+        self.wnacg_adapter = wnacg_adapter
         
         self._setup_ui()
         self._load_settings()
@@ -92,6 +96,7 @@ class SettingsPage(QWidget):
             "常规设置",
             "PicACG",
             "JMComic", 
+            "绅士漫画",
             "下载设置",
             "使用须知"
         ]
@@ -115,6 +120,7 @@ class SettingsPage(QWidget):
         self.pages['general'] = self._create_general_page()
         self.pages['picacg'] = self._create_picacg_page()
         self.pages['jmcomic'] = self._create_jmcomic_page()
+        self.pages['wnacg'] = self._create_wnacg_page()
         self.pages['download'] = self._create_download_page()
         self.pages['tips'] = self._create_tips_page()
         
@@ -629,6 +635,282 @@ class SettingsPage(QWidget):
         
         return page
     
+    def _create_wnacg_page(self) -> QWidget:
+        """创建WNACG设置页面"""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
+        
+        # 标题
+        title = QLabel("绅士漫画 (WNACG) 设置")
+        title.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(title)
+        
+        # 说明文本
+        info_text = QLabel(
+            "绅士漫画 (WNACG) 是一个本子站，具有以下特点：\n"
+            "• 无需登录即可使用\n"
+            "• 自动域名发现和切换\n"
+            "• 部分词条漫画量大，搜索后可能会有2-3s的卡顿，已经做了相关的线程管理，可还是避免不了卡顿，只好等待~~\n"
+            "• 已禁止新用户注册，API相对稳定\n"
+            "• 整本作为一个章节处理"
+        )
+        info_text.setWordWrap(True)
+        info_text.setStyleSheet("""
+            QLabel {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 15px;
+                font-size: 13px;
+                color: #495057;
+                line-height: 1.5;
+            }
+        """)
+        layout.addWidget(info_text)
+        
+        # 域名状态组
+        domain_group = QGroupBox("域名管理")
+        domain_layout = QVBoxLayout(domain_group)
+        
+        # 当前域名显示
+        current_domain_layout = QHBoxLayout()
+        current_domain_layout.addWidget(QLabel("当前域名:"))
+        
+        self.wnacg_domain_label = QLabel("自动获取中...")
+        self.wnacg_domain_label.setStyleSheet("""
+            QLabel {
+                background-color: #f0f0f0;
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+                padding: 8px;
+                font-family: monospace;
+                min-width: 200px;
+            }
+        """)
+        current_domain_layout.addWidget(self.wnacg_domain_label)
+        current_domain_layout.addStretch()
+        domain_layout.addLayout(current_domain_layout)
+        
+        # 域名状态标签
+        self.wnacg_domain_status = QLabel("点击按钮测试域名状态")
+        self.wnacg_domain_status.setWordWrap(True)
+        self.wnacg_domain_status.setStyleSheet("color: #666666; font-size: 12px; margin: 5px 0;")
+        domain_layout.addWidget(self.wnacg_domain_status)
+        
+        # 域名操作按钮
+        domain_buttons_layout = QHBoxLayout()
+        
+        self.test_domain_btn = QPushButton("测试域名")
+        self.test_domain_btn.setFixedSize(100, 35)
+        self.test_domain_btn.clicked.connect(self._test_wnacg_domain_async)
+        
+        self.refresh_domain_btn = QPushButton("刷新域名")
+        self.refresh_domain_btn.setFixedSize(100, 35)
+        self.refresh_domain_btn.clicked.connect(self._refresh_wnacg_domain_async)
+        
+        for btn in [self.test_domain_btn, self.refresh_domain_btn]:
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #0056b3;
+                }
+                QPushButton:disabled {
+                    background-color: #6c757d;
+                }
+            """)
+        
+        domain_buttons_layout.addWidget(self.test_domain_btn)
+        domain_buttons_layout.addWidget(self.refresh_domain_btn)
+        domain_buttons_layout.addStretch()
+        
+        domain_layout.addLayout(domain_buttons_layout)
+        layout.addWidget(domain_group)
+        
+        # 使用说明组
+        usage_group = QGroupBox("使用说明")
+        usage_layout = QVBoxLayout(usage_group)
+        
+        usage_text = QLabel(
+            "• 搜索：支持中文、英文、日文关键词搜索\n"
+            "• 分类：同人誌、单行本、韩漫、3D等\n"
+            "• 阅读：点击漫画封面查看详情，点击\"阅读\"按钮开始阅读\n"
+            "• 下载：支持单本下载和批量队列下载\n"
+            "• 域名：如遇访问问题，点击\"刷新域名\"获取最新可用域名"
+        )
+        usage_text.setWordWrap(True)
+        usage_text.setStyleSheet("""
+            QLabel {
+                background-color: #e9ecef;
+                border: 1px solid #ced4da;
+                border-radius: 6px;
+                padding: 12px;
+                font-size: 13px;
+                color: #495057;
+                line-height: 1.4;
+            }
+        """)
+        usage_layout.addWidget(usage_text)
+        layout.addWidget(usage_group)
+        
+        layout.addStretch()
+        
+        # 加载当前域名
+        self._load_wnacg_domain()
+        
+        return page
+    
+    def _load_wnacg_domain(self) -> None:
+        """加载WNACG当前域名"""
+        try:
+            if self.wnacg_adapter and hasattr(self.wnacg_adapter, 'api'):
+                if hasattr(self.wnacg_adapter.api.async_source, 'domain') and self.wnacg_adapter.api.async_source.domain:
+                    domain = self.wnacg_adapter.api.async_source.domain
+                    self.wnacg_domain_label.setText(domain)
+                else:
+                    self.wnacg_domain_label.setText("未初始化")
+            else:
+                self.wnacg_domain_label.setText("适配器未可用")
+        except Exception as e:
+            print(f"Failed to load WNACG domain: {e}")
+            self.wnacg_domain_label.setText("获取失败")
+    
+    def _test_wnacg_domain(self) -> None:
+        """测试WNACG域名"""
+        if not self.wnacg_adapter:
+            self.wnacg_domain_status.setText("❌ WNACG适配器不可用")
+            self.wnacg_domain_status.setStyleSheet("color: red;")
+            return
+        
+        self.wnacg_domain_status.setText("测试中...")
+        self.wnacg_domain_status.setStyleSheet("color: blue;")
+        
+        try:
+            # 简单的搜索测试
+            result = self.wnacg_adapter.search("test", 1)
+            if result and result.get("comics"):
+                self.wnacg_domain_status.setText("✅ 域名可用，搜索正常")
+                self.wnacg_domain_status.setStyleSheet("color: green;")
+            else:
+                self.wnacg_domain_status.setText("⚠️ 域名响应异常")
+                self.wnacg_domain_status.setStyleSheet("color: orange;")
+        except Exception as e:
+            self.wnacg_domain_status.setText(f"❌ 域名不可用: {str(e)[:50]}")
+            self.wnacg_domain_status.setStyleSheet("color: red;")
+    
+    def _refresh_wnacg_domain(self) -> None:
+        """刷新WNACG域名"""
+        if not self.wnacg_adapter:
+            self.wnacg_domain_status.setText("❌ WNACG适配器不可用")
+            self.wnacg_domain_status.setStyleSheet("color: red;")
+            return
+        
+        self.wnacg_domain_status.setText("正在从发布页获取最新域名...")
+        self.wnacg_domain_status.setStyleSheet("color: blue;")
+        
+        try:
+            # 重新初始化适配器以获取新域名
+            old_domain = getattr(self.wnacg_adapter.api.async_source, 'domain', '未知')
+            
+            # 清除当前域名，强制重新获取
+            self.wnacg_adapter.api.async_source.domain = None
+            
+            # 执行一次搜索来触发域名获取
+            result = self.wnacg_adapter.search("test", 1)
+            
+            new_domain = getattr(self.wnacg_adapter.api.async_source, 'domain', '未知')
+            
+            if new_domain and new_domain != old_domain:
+                self.wnacg_domain_label.setText(new_domain)
+                self.wnacg_domain_status.setText(f"✅ 已更新域名: {old_domain} → {new_domain}")
+                self.wnacg_domain_status.setStyleSheet("color: green;")
+            elif new_domain:
+                self.wnacg_domain_label.setText(new_domain)
+                self.wnacg_domain_status.setText(f"ℹ️ 域名未变化: {new_domain}")
+                self.wnacg_domain_status.setStyleSheet("color: blue;")
+            else:
+                self.wnacg_domain_status.setText("❌ 获取域名失败")
+                self.wnacg_domain_status.setStyleSheet("color: red;")
+                
+        except Exception as e:
+            self.wnacg_domain_status.setText(f"❌ 刷新失败: {str(e)[:50]}")
+            self.wnacg_domain_status.setStyleSheet("color: red;")
+    
+    def _test_wnacg_domain_async(self) -> None:
+        """异步测试WNACG域名"""
+        if not self.wnacg_adapter:
+            self.wnacg_domain_status.setText("❌ WNACG适配器不可用")
+            self.wnacg_domain_status.setStyleSheet("color: red;")
+            return
+        
+        # 禁用按钮防止重复点击
+        self.test_domain_btn.setEnabled(False)
+        self.wnacg_domain_status.setText("测试中...")
+        self.wnacg_domain_status.setStyleSheet("color: blue;")
+        
+        # 使用QTimer延迟执行，避免阻塞UI
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(100, self._do_test_wnacg_domain)
+    
+    def _do_test_wnacg_domain(self) -> None:
+        """执行域名测试"""
+        try:
+            result = self.wnacg_adapter.search("test", 1)
+            if result and result.get("comics"):
+                self.wnacg_domain_status.setText("✅ 域名可用，搜索正常")
+                self.wnacg_domain_status.setStyleSheet("color: green;")
+            else:
+                self.wnacg_domain_status.setText("⚠️ 域名响应异常")
+                self.wnacg_domain_status.setStyleSheet("color: orange;")
+        except Exception as e:
+            self.wnacg_domain_status.setText(f"❌ 域名不可用: {str(e)[:50]}")
+            self.wnacg_domain_status.setStyleSheet("color: red;")
+        finally:
+            self.test_domain_btn.setEnabled(True)
+    
+    def _refresh_wnacg_domain_async(self) -> None:
+        """异步刷新WNACG域名"""
+        if not self.wnacg_adapter:
+            self.wnacg_domain_status.setText("❌ WNACG适配器不可用")
+            self.wnacg_domain_status.setStyleSheet("color: red;")
+            return
+        
+        # 禁用按钮防止重复点击
+        self.refresh_domain_btn.setEnabled(False)
+        self.wnacg_domain_status.setText("正在从发布页获取最新域名...")
+        self.wnacg_domain_status.setStyleSheet("color: blue;")
+        
+        # 使用QTimer延迟执行，避免阻塞UI
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(100, self._do_refresh_wnacg_domain)
+    
+    def _do_refresh_wnacg_domain(self) -> None:
+        """执行域名刷新"""
+        try:
+            new_domain = self.wnacg_adapter.refresh_domain()
+            
+            # 更新UI显示
+            self.wnacg_domain_label.setText(new_domain)
+            self.wnacg_domain_status.setText(f"✅ 域名已更新: {new_domain}")
+            self.wnacg_domain_status.setStyleSheet("color: green;")
+            
+            # 保存配置
+            self.config_manager.set('wnacg.domain', new_domain)
+            self.config_manager.save_config()
+            
+        except Exception as e:
+            self.wnacg_domain_status.setText(f"❌ 刷新失败: {str(e)[:50]}")
+            self.wnacg_domain_status.setStyleSheet("color: red;")
+        finally:
+            self.refresh_domain_btn.setEnabled(True)
+
     def _create_download_page(self) -> QWidget:
         """创建下载设置页面"""
         page = QWidget()
@@ -974,7 +1256,7 @@ class SettingsPage(QWidget):
             self.github_button.setText("🔗 Visit GitHub Homepage")
             
             disclaimer_content = """
-            <p><strong>ComicGo</strong> is a free and open-source comic reading software for educational and research purposes only.</p>
+            <p><strong>PanComic</strong> is a free and open-source comic reading software for educational and research purposes only.</p>
             <p><strong>Important Notice:</strong></p>
             <ul>
                 <li>This software does not provide any comic content; all content comes from third-party websites</li>
@@ -1619,6 +1901,10 @@ class SettingsPage(QWidget):
     def navigate_to_jmcomic(self) -> None:
         """导航到JMComic设置页面"""
         self.nav_list.setCurrentRow(2)  # JMComic是第三个项目（索引2）
+    
+    def navigate_to_wnacg(self) -> None:
+        """导航到WNACG设置页面"""
+        self.nav_list.setCurrentRow(3)  # WNACG是第四个项目（索引3）
     
     def _clear_cache(self) -> None:
         """清除图片缓存"""

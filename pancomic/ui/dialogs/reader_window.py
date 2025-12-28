@@ -139,12 +139,21 @@ class ReaderWindow(QMainWindow):
         """Load chapter from local storage without network requests."""
         from pathlib import Path
         
+        print(f"[DEBUG] Loading local chapter: {self.chapter.title}")
+        print(f"[DEBUG] Chapter ID: {self.chapter.id}")
+        print(f"[DEBUG] Download path: {self.chapter.download_path}")
+        print(f"[DEBUG] Is downloaded: {self.chapter.is_downloaded}")
+        
         if not self.chapter.download_path:
+            print("[ERROR] No download path")
             self.image_label.setText("本地路径未找到")
             return
         
         chapter_path = Path(self.chapter.download_path)
+        print(f"[DEBUG] Checking path exists: {chapter_path}")
+        
         if not chapter_path.exists():
+            print(f"[ERROR] Path does not exist: {chapter_path}")
             self.image_label.setText(f"本地文件不存在: {chapter_path}")
             return
         
@@ -158,16 +167,23 @@ class ReaderWindow(QMainWindow):
                 if f.is_file() and f.suffix.lower() in image_extensions:
                     image_files.append(str(f))
             
+            print(f"[DEBUG] Found {len(image_files)} image files")
+            
             # Sort by filename (natural sort for page numbers)
             image_files.sort(key=lambda x: Path(x).name)
             
             self.images = image_files
             
             if self.images:
+                print(f"[DEBUG] Loading first page: {self.images[0]}")
                 self.show_page(0)
             else:
+                print("[ERROR] No image files found")
                 self.image_label.setText("未找到图片文件")
         except Exception as e:
+            print(f"[ERROR] Exception in _load_local_chapter: {e}")
+            import traceback
+            traceback.print_exc()
             self.image_label.setText(f"加载本地章节失败: {str(e)}")
     
     def _load_remote_chapter(self) -> None:

@@ -13,14 +13,13 @@
 
 ## 📸 截图
 
-<!-- 可以添加截图 -->
+<!\example1.png>   <!\example2.png>
 
 ## 🚀 快速开始
 
 ### 环境要求
 
 - Python 3.10+
-- Windows / macOS / Linux
 
 ### 安装
 
@@ -34,11 +33,7 @@ pip install -r pancomic/requirements.txt
 
 # 运行
 python -m pancomic.main
-
-# 自行打包（确保包含了PanComic.spec文件）
-pyinstaller PanComic.spec --clean
 ```
-
 
 ## 📁 项目结构
 
@@ -54,10 +49,11 @@ PanComic/
 │   │   ├── widgets/       # 组件
 │   │   └── dialogs/       # 对话框
 │   └── infrastructure/    # 基础设施
-├── forapi/                # API 封装
+├── forapi/                # API 相关方法封装
 │   ├── jmcomic/           # JMComic API
 │   └── picacg/            # PicACG API
-└── downloads/             # 下载目录（首次运行生成）
+│   └── wnacg_source,py    # 绅士漫画 API
+└── downloads/             # 下载目录
 ```
 
 ## ⚠️ 免责声明

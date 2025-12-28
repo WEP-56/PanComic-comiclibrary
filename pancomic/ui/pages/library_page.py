@@ -473,7 +473,7 @@ class LibraryPage(QWidget):
                     continue
                 
                 source_name = source_dir.name
-                if source_name not in ['jmcomic', 'picacg', 'user']:
+                if source_name not in ['jmcomic', 'picacg', 'wnacg', 'user']:
                     continue
                 
                 # Scan comics in this source directory
@@ -621,11 +621,25 @@ class LibraryPage(QWidget):
         Args:
             comic: Double-clicked comic object
         """
+        print(f"[DEBUG] Double-clicked comic: {comic.title}")
+        print(f"[DEBUG] Comic ID: {comic.id}")
+        print(f"[DEBUG] Comic source: {comic.source}")
+        
         # Load the first available chapter for reading
         chapter = self._get_first_chapter(comic)
+        print(f"[DEBUG] Got chapter: {chapter}")
+        
         if chapter:
+            print(f"[DEBUG] Chapter details:")
+            print(f"  ID: {chapter.id}")
+            print(f"  Title: {chapter.title}")
+            print(f"  Download path: {chapter.download_path}")
+            print(f"  Is downloaded: {chapter.is_downloaded}")
+            print(f"  Page count: {chapter.page_count}")
+            
             self.comic_read_requested.emit(comic, chapter)
         else:
+            print("[ERROR] No chapter found")
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "阅读", "未找到可阅读的章节")
     
@@ -744,23 +758,34 @@ class LibraryPage(QWidget):
             First chapter if available, None otherwise
         """
         try:
+            print(f"[DEBUG] _get_first_chapter for comic: {comic.id}")
+            
             # Load metadata to get chapter information
             comic_dir = self.download_path / comic.source / comic.id
             metadata_file = comic_dir / 'metadata.json'
             
+            print(f"[DEBUG] Looking for metadata at: {metadata_file}")
+            
             if not metadata_file.exists():
+                print(f"[ERROR] Metadata file does not exist: {metadata_file}")
                 return None
             
             with open(metadata_file, 'r', encoding='utf-8') as f:
                 metadata = json.load(f)
             
             chapters_data = metadata.get('chapters', {})
+            print(f"[DEBUG] Chapters data: {chapters_data}")
+            
             if not chapters_data:
+                print("[ERROR] No chapters data found")
                 return None
             
             # Get the first chapter
             first_chapter_id = list(chapters_data.keys())[0]
             chapter_data = chapters_data[first_chapter_id]
+            
+            print(f"[DEBUG] First chapter ID: {first_chapter_id}")
+            print(f"[DEBUG] Chapter data: {chapter_data}")
             
             # Create Chapter object
             from pancomic.models.chapter import Chapter
@@ -775,10 +800,13 @@ class LibraryPage(QWidget):
                 source=comic.source
             )
             
+            print(f"[DEBUG] Created chapter successfully: {chapter}")
             return chapter
             
         except Exception as e:
             print(f"Error loading chapter for comic {comic.id}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def _confirm_delete_comic(self, comic: Comic) -> None:

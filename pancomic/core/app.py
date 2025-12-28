@@ -15,6 +15,8 @@ from pancomic.infrastructure.download_manager import DownloadManager
 from pancomic.adapters.jmcomic_adapter import JMComicAdapter
 from pancomic.adapters.ehentai_adapter import EHentaiAdapter
 from pancomic.adapters.picacg_adapter import PicACGAdapter
+from pancomic.adapters.wnacg_adapter import WNACGAdapter
+from pancomic.adapters.wnacg_adapter import WNACGAdapter
 from pancomic.ui.main_window import MainWindow
 
 
@@ -60,6 +62,7 @@ class Application:
         self.jmcomic_adapter: Optional[JMComicAdapter] = None
         self.ehentai_adapter: Optional[EHentaiAdapter] = None
         self.picacg_adapter: Optional[PicACGAdapter] = None
+        self.wnacg_adapter: Optional[WNACGAdapter] = None
         
         # Main window
         self.main_window: Optional[MainWindow] = None
@@ -150,6 +153,7 @@ class Application:
                 jmcomic_adapter=self.jmcomic_adapter,
                 ehentai_adapter=self.ehentai_adapter,
                 picacg_adapter=self.picacg_adapter,
+                wnacg_adapter=self.wnacg_adapter,
                 download_manager=self.download_manager
             )
             
@@ -240,6 +244,11 @@ class Application:
                     "storage1.picacomic.com"
                 ],
                 "image_quality": "original"
+            },
+            "wnacg": {
+                "enabled": True,
+                "domain": "",
+                "auto_domain_discovery": True
             }
         }
         
@@ -255,16 +264,19 @@ class Application:
         jmcomic_config = self.config_manager.get_source_config('jmcomic')
         ehentai_config = self.config_manager.get_source_config('ehentai')
         picacg_config = self.config_manager.get_source_config('picacg')
+        wnacg_config = self.config_manager.get_source_config('wnacg')
         
         # Create adapters
         self.jmcomic_adapter = JMComicAdapter(jmcomic_config)
         self.ehentai_adapter = EHentaiAdapter(ehentai_config)
         self.picacg_adapter = PicACGAdapter(picacg_config)
+        self.wnacg_adapter = WNACGAdapter(wnacg_config)
         
         # Start worker threads
         self.jmcomic_adapter.start_worker_thread()
         self.ehentai_adapter.start_worker_thread()
         self.picacg_adapter.start_worker_thread()
+        self.wnacg_adapter.start_worker_thread()
         
         # Initialize adapters
         try:
@@ -285,9 +297,16 @@ class Application:
         except Exception as e:
             Logger.error(f"Failed to initialize PicACG adapter: {e}")
         
+        try:
+            self.wnacg_adapter.initialize()
+            Logger.info("WNACG adapter initialized")
+        except Exception as e:
+            Logger.error(f"Failed to initialize WNACG adapter: {e}")
+        
         # Register download functions
         self.download_manager.register_download_function('jmcomic', self.jmcomic_adapter.download_chapter)
         self.download_manager.register_download_function('picacg', self.picacg_adapter.download_chapter)
+        self.download_manager.register_download_function('wnacg', self.wnacg_adapter.download_chapter)
         # Note: EHentai download function is disabled
         
         Logger.info("Source adapters initialized and download functions registered")
@@ -362,6 +381,8 @@ class Application:
             self.ehentai_adapter.stop_worker_thread()
         if self.picacg_adapter:
             self.picacg_adapter.stop_worker_thread()
+        if self.wnacg_adapter:
+            self.wnacg_adapter.stop_worker_thread()
         
         # Close database
         if self.database:
@@ -413,7 +434,7 @@ class Application:
         Get adapter for a specific source.
         
         Args:
-            source: Source name ('jmcomic', 'ehentai', 'picacg')
+            source: Source name ('jmcomic', 'ehentai', 'picacg', 'wnacg')
             
         Returns:
             Adapter instance or None if not found
@@ -424,6 +445,8 @@ class Application:
             return self.ehentai_adapter
         elif source == 'picacg':
             return self.picacg_adapter
+        elif source == 'wnacg':
+            return self.wnacg_adapter
         return None
 
 

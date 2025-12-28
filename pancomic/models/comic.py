@@ -57,7 +57,7 @@ class Comic:
             raise ValueError("Comic description must be a string or None")
         
         # Validate source
-        valid_sources = ["jmcomic", "picacg", "user"]
+        valid_sources = ["jmcomic", "picacg", "wnacg", "user"]
         if self.source not in valid_sources:
             raise ValueError(f"Comic source must be one of {valid_sources}, got '{self.source}'")
         

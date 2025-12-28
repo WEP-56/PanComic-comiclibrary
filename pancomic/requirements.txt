@@ -48,5 +48,6 @@ natsort>=8.4.0
 # HTML Parsing
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
-
 # pyinstaller打包命令：pyinstaller PanComic.spec --clean
+cloudscraper
+curl_cffi
