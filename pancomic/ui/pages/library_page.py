@@ -9,9 +9,9 @@ from datetime import datetime
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QComboBox, QLabel,
-    QSplitter, QFrame, QScrollArea, QGridLayout, QMenu, QMessageBox
+    QSplitter, QFrame, QScrollArea, QGridLayout, QMenu, QMessageBox, QSizePolicy
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QAction, QCursor
 
 from pancomic.models.comic import Comic
@@ -56,6 +56,12 @@ class LibraryPage(QWidget):
         # Anime history manager
         self.anime_history_manager = AnimeHistoryManager()
         
+        # 添加动漫下载相关属性
+        self._current_anime: Optional[Anime] = None
+        self._episodes_data: dict = {}
+        
+        # 下载队列管理器已移除（动漫下载功能已禁用）
+        
         # Anime cards list for theme support
         self._anime_cards = []
         
@@ -87,8 +93,8 @@ class LibraryPage(QWidget):
         self.comics_section = self._create_comics_section()
         self.splitter.addWidget(self.comics_section)
         
-        # Bottom section: 动漫历史
-        self.anime_section = self._create_anime_section()
+        # Bottom section: 动漫历史 (with detail panel)
+        self.anime_section = self._create_anime_section_with_detail()
         self.splitter.addWidget(self.anime_section)
         
         # Set 50:50 ratio
@@ -355,8 +361,8 @@ class LibraryPage(QWidget):
         
         return section
     
-    def _create_anime_section(self) -> QWidget:
-        """Create the anime history section (bottom half)."""
+    def _create_anime_section_with_detail(self) -> QWidget:
+        """Create the anime history section with detail panel (bottom half)."""
         section = QWidget()
         layout = QVBoxLayout(section)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -400,24 +406,369 @@ class LibraryPage(QWidget):
         
         layout.addWidget(self.anime_header)
         
+        # Main content with splitter (left: anime grid, right: detail panel)
+        self.anime_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.anime_splitter.setHandleWidth(4)
+        self.anime_splitter.setStyleSheet("""
+            QSplitter::handle { background-color: #3a3a3a; }
+            QSplitter::handle:hover { background-color: #0078d4; }
+        """)
+        
+        # Left: Anime grid
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        
         # Anime grid (scrollable)
         self.anime_grid = AnimeGrid(columns=3)
-        self.anime_grid.anime_clicked.connect(self._on_anime_clicked)
-        self.anime_grid.anime_double_clicked.connect(self._on_anime_double_clicked)
-        self.anime_grid.anime_right_clicked.connect(self._on_anime_right_clicked)
-        layout.addWidget(self.anime_grid)
+        self.anime_grid.anime_clicked.connect(self._on_history_anime_clicked)
+        self.anime_grid.anime_double_clicked.connect(self._on_history_anime_double_clicked)
+        self.anime_grid.anime_right_clicked.connect(self._on_history_anime_right_clicked)
+        
+        left_layout.addWidget(self.anime_grid)
+        self.anime_splitter.addWidget(left_panel)
+        
+        # Right: Detail panel with scroll area
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create scroll area for detail panel
+        detail_scroll = QScrollArea()
+        detail_scroll.setWidgetResizable(True)
+        detail_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        detail_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        detail_scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollBar:vertical {
+                background-color: #2b2b2b;
+                width: 12px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #3a3a3a;
+                border-radius: 6px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #4a4a4a;
+            }
+        """)
+        
+        # Import the detail panel from anime search page
+        from pancomic.ui.pages.anime_search_page import AnimeDetailPanel
+        self.anime_detail_panel = AnimeDetailPanel()
+        
+        # Connect detail panel signals
+        self.anime_detail_panel.open_link_requested.connect(self._open_anime_link)
+        self.anime_detail_panel.add_to_history_requested.connect(self.add_anime_to_history)
+        self.anime_detail_panel.play_video_requested.connect(self._play_anime_video)
+        self.anime_detail_panel.episodes_data_loaded.connect(self._on_episodes_data_loaded)
+        
+        # Put detail panel inside scroll area
+        detail_scroll.setWidget(self.anime_detail_panel)
+        right_layout.addWidget(detail_scroll)
+        
+        self.anime_splitter.addWidget(right_panel)
+        
+        # 设置分割器属性 - 右侧固定大小
+        self.anime_splitter.setChildrenCollapsible(False)  # 防止面板被完全折叠
+        self.anime_splitter.setHandleWidth(4)  # 设置分割条宽度
+        
+        # 设置面板大小约束
+        left_panel.setMinimumWidth(300)
+        left_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        
+        right_panel.setMinimumWidth(350)  # 右侧面板固定合适的最小宽度
+        right_panel.setMaximumWidth(450)  # 右侧面板最大宽度
+        right_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        
+        # 设置初始比例和伸缩因子
+        self.anime_splitter.setSizes([600, 380])  # 初始大小，给右侧更多空间显示内容
+        self.anime_splitter.setStretchFactor(0, 3)  # 左侧伸缩因子为3
+        self.anime_splitter.setStretchFactor(1, 1)  # 右侧伸缩因子为1，保持相对固定
+        
+        layout.addWidget(self.anime_splitter)
         
         return section
 
+    def _on_history_anime_clicked(self, anime: Anime) -> None:
+        """Handle anime card click in history."""
+        if anime.status == "local":
+            # 本地视频，显示本地剧集
+            self._show_local_episodes(anime)
+        else:
+            # 历史动漫，显示信息
+            print(f"Anime clicked: {anime.name}")
+    
+    def _on_history_anime_double_clicked(self, anime: Anime) -> None:
+        """Handle anime card double click in history - show in detail panel."""
+        print(f"LibraryPage: Double clicked anime: {anime.name} (id: {anime.id})")
+        
+        # 清理之前的适配器连接
+        if hasattr(self, '_current_adapter') and self._current_adapter:
+            try:
+                self._current_adapter.cleanup()
+                self._current_adapter = None
+                print(f"[LibraryPage] 清理旧适配器成功")
+            except Exception as e:
+                print(f"[LibraryPage] 清理旧适配器失败: {e}")
+        
+        # 设置当前选中的动漫
+        self._current_anime = anime
+        print(f"LibraryPage: Set _current_anime to: {self._current_anime}")
+        
+        if anime.source == "dm569":
+            # DM569源的动漫，需要适配器
+            try:
+                from pancomic.adapters.dm569_adapter import DM569Adapter
+                self._current_adapter = DM569Adapter()
+                self.anime_detail_panel.show_anime(anime, self._current_adapter)
+                print(f"[LibraryPage] 成功显示DM569动漫详情: {anime.name}")
+            except Exception as e:
+                error_msg = f"显示DM569动漫详情失败: {e}"
+                print(f"[LibraryPage] {error_msg}")
+                import traceback
+                traceback.print_exc()
+                QMessageBox.warning(self, "显示失败", error_msg)
+        else:
+            # Bangumi源的动漫，直接显示
+            try:
+                self.anime_detail_panel.show_anime(anime)
+                print(f"[LibraryPage] 成功显示Bangumi动漫详情: {anime.name}")
+            except Exception as e:
+                error_msg = f"显示Bangumi动漫详情失败: {e}"
+                print(f"[LibraryPage] {error_msg}")
+                import traceback
+                traceback.print_exc()
+                QMessageBox.warning(self, "显示失败", error_msg)
+    
+    def _on_history_anime_right_clicked(self, anime: Anime) -> None:
+        """Handle anime card right click in history."""
+        # 复用原来的右键菜单逻辑
+        self._on_anime_right_clicked(anime)
+    
+    def _open_anime_link(self, url: str):
+        """Open anime link in browser."""
+        webbrowser.open(url)
+    
+    def _play_anime_video(self, anime_id: str, line: int, episode: int):
+        """Handle anime video play request from detail panel."""
+        print(f"Playing video: anime_id={anime_id}, line={line}, episode={episode}")
+        
+        # 使用独立线程获取视频播放地址，避免阻塞主线程
+        if self._current_anime and self._current_anime.source == "dm569":
+            # 创建独立的适配器实例用于播放
+            self._play_adapter = None
+            try:
+                from pancomic.adapters.dm569_adapter import DM569Adapter
+                self._play_adapter = DM569Adapter()
+                self._play_adapter.video_completed.connect(self._on_play_video_url_ready)
+                self._play_adapter.video_failed.connect(self._on_play_video_url_failed)
+                
+                # 在独立线程中获取视频URL
+                QTimer.singleShot(0, lambda: self._play_adapter.get_video_url(anime_id, line, episode))
+                
+            except Exception as e:
+                error_msg = f"创建播放适配器失败: {e}"
+                print(f"[LibraryPage] {error_msg}")
+                QMessageBox.critical(self, "播放失败", error_msg)
+        else:
+            QMessageBox.warning(self, "播放失败", "暂不支持该源的播放")
+    
+    def _on_play_video_url_ready(self, video_info: dict):
+        """Handle video URL ready for play"""
+        try:
+            print(f"[LibraryPage] 收到播放视频URL: {video_info}")
+            
+            if not video_info.get('success'):
+                error = video_info.get('error', '未知错误')
+                QMessageBox.warning(self, "播放失败", f"无法获取视频地址: {error}")
+                return
+            
+            stream_url = video_info.get('stream_url')
+            if not stream_url:
+                QMessageBox.warning(self, "播放失败", "获取到的视频地址为空")
+                return
+            
+            print(f"[LibraryPage] 获取到播放URL: {stream_url}")
+            
+            # 使用系统默认浏览器打开视频链接
+            import webbrowser
+            try:
+                webbrowser.open(stream_url)
+                print(f"[LibraryPage] 成功打开播放链接")
+            except Exception as e:
+                error_msg = f"打开播放链接失败: {e}"
+                print(f"[LibraryPage] {error_msg}")
+                QMessageBox.warning(self, "播放失败", error_msg)
+            
+        except Exception as e:
+            error_msg = f"处理播放URL时发生异常: {str(e)}"
+            print(f"[LibraryPage] {error_msg}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "播放失败", error_msg)
+        finally:
+            # 清理播放适配器
+            if hasattr(self, '_play_adapter') and self._play_adapter:
+                try:
+                    self._play_adapter.cleanup()
+                    self._play_adapter = None
+                except Exception as e:
+                    print(f"[LibraryPage] 清理播放适配器失败: {e}")
+    
+    def _on_play_video_url_failed(self, error: str):
+        """Handle video URL fetch failure for play"""
+        print(f"[LibraryPage] 播放URL获取失败: {error}")
+        QMessageBox.warning(self, "播放失败", f"获取视频地址失败: {error}")
+        
+        # 清理播放适配器
+        if hasattr(self, '_play_adapter') and self._play_adapter:
+            try:
+                self._play_adapter.cleanup()
+                self._play_adapter = None
+            except Exception as e:
+                print(f"[LibraryPage] 清理播放适配器失败: {e}")
+    
+    def closeEvent(self, event):
+        """页面关闭事件 - 清理资源"""
+        try:
+            print("[LibraryPage] 页面关闭，清理资源")
+            
+            # 清理当前适配器
+            if hasattr(self, '_current_adapter') and self._current_adapter:
+                try:
+                    self._current_adapter.cleanup()
+                    self._current_adapter = None
+                    print("[LibraryPage] 清理当前适配器成功")
+                except Exception as e:
+                    print(f"[LibraryPage] 清理当前适配器失败: {e}")
+            
+            # 清理播放适配器
+            if hasattr(self, '_play_adapter') and self._play_adapter:
+                try:
+                    self._play_adapter.cleanup()
+                    self._play_adapter = None
+                    print("[LibraryPage] 清理播放适配器成功")
+                except Exception as e:
+                    print(f"[LibraryPage] 清理播放适配器失败: {e}")
+                    
+        except Exception as e:
+            print(f"[LibraryPage] 页面关闭清理失败: {e}")
+        
+        super().closeEvent(event)
+    
+    def _on_episodes_data_loaded(self, episodes_data: dict):
+        """Handle episodes data loaded from detail panel"""
+        print(f"LibraryPage: Episodes data loaded: {list(episodes_data.keys()) if episodes_data else 'None'}")
+        self._episodes_data = episodes_data
+
     def _on_anime_clicked(self, anime: Anime) -> None:
         """Handle anime card click."""
-        # For now, just print the anime info - in the future this could emit a signal
-        print(f"Anime clicked: {anime.name}")
+        if anime.status == "local":
+            # 本地视频，显示本地剧集
+            self._show_local_episodes(anime)
+        else:
+            # 历史动漫，显示信息
+            print(f"Anime clicked: {anime.name}")
     
     def _on_anime_double_clicked(self, anime: Anime) -> None:
-        """Open anime in browser."""
-        if anime.bangumi_url:
+        """Open anime in browser or play local video."""
+        if anime.status == "local":
+            # 本地视频，播放第一集
+            self._play_first_local_episode(anime)
+        elif anime.bangumi_url:
+            # 历史动漫，打开浏览器
             webbrowser.open(anime.bangumi_url)
+    
+    def _show_local_episodes(self, anime: Anime) -> None:
+        """显示本地剧集列表"""
+        episodes = self.anime_history_manager.get_local_episodes_for_anime(str(anime.id))
+        
+        if not episodes:
+            QMessageBox.information(self, "本地剧集", "没有找到本地剧集")
+            return
+        
+        # 创建剧集列表对话框
+        from PySide6.QtWidgets import QDialog, QListWidget, QListWidgetItem
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"本地剧集 - {anime.name}")
+        dialog.setFixedSize(400, 300)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # 剧集列表
+        episode_list = QListWidget()
+        for episode_data in episodes:
+            episode_info = episode_data["episode"]
+            item_text = f"{episode_info['name']} (第{episode_info['ep']}集)"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.ItemDataRole.UserRole, episode_data)
+            episode_list.addItem(item)
+        
+        episode_list.itemDoubleClicked.connect(
+            lambda item: self._play_local_episode(item.data(Qt.ItemDataRole.UserRole))
+        )
+        
+        layout.addWidget(episode_list)
+        
+        # 按钮
+        button_layout = QHBoxLayout()
+        
+        play_btn = QPushButton("播放")
+        play_btn.clicked.connect(
+            lambda: self._play_local_episode(
+                episode_list.currentItem().data(Qt.ItemDataRole.UserRole)
+            ) if episode_list.currentItem() else None
+        )
+        button_layout.addWidget(play_btn)
+        
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dialog.close)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+        dialog.exec()
+    
+    def _play_first_local_episode(self, anime: Anime) -> None:
+        """播放第一集本地视频"""
+        episodes = self.anime_history_manager.get_local_episodes_for_anime(str(anime.id))
+        
+        if episodes:
+            # 按剧集号排序，播放第一集
+            episodes.sort(key=lambda x: x["episode"].get("ep", 0))
+            self._play_local_episode(episodes[0])
+        else:
+            QMessageBox.information(self, "播放失败", "没有找到本地剧集")
+    
+    def _play_local_episode(self, episode_data: dict) -> None:
+        """播放本地剧集"""
+        episode_info = episode_data["episode"]
+        download_path = episode_info.get("download_path", "")
+        
+        if not download_path or not Path(download_path).exists():
+            QMessageBox.warning(self, "播放失败", "视频文件不存在")
+            return
+        
+        # 使用系统默认播放器打开视频
+        import subprocess
+        import sys
+        
+        try:
+            if sys.platform == "win32":
+                os.startfile(download_path)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", download_path])
+            else:
+                subprocess.run(["xdg-open", download_path])
+        except Exception as e:
+            QMessageBox.warning(self, "播放失败", f"无法打开视频文件: {str(e)}")
     
     def _on_anime_right_clicked(self, anime: Anime) -> None:
         """Show context menu for anime."""
@@ -438,15 +789,43 @@ class LibraryPage(QWidget):
             QMenu::item:selected { background-color: #0078d4; }
         """)
         
-        # Delete from history
-        delete_action = QAction("🗑️ 删除历史", self)
-        delete_action.triggered.connect(lambda: self._delete_anime_history(anime))
-        menu.addAction(delete_action)
-        
-        # Copy link
-        copy_action = QAction("🔗 复制链接", self)
-        copy_action.triggered.connect(lambda: self._copy_anime_link(anime))
-        menu.addAction(copy_action)
+        if anime.status == "local":
+            # 本地视频菜单
+            play_action = QAction("▶ 播放第一集", self)
+            play_action.triggered.connect(lambda: self._play_first_local_episode(anime))
+            menu.addAction(play_action)
+            
+            episodes_action = QAction("📋 查看剧集", self)
+            episodes_action.triggered.connect(lambda: self._show_local_episodes(anime))
+            menu.addAction(episodes_action)
+            
+            menu.addSeparator()
+            
+            folder_action = QAction("📁 打开文件夹", self)
+            folder_action.triggered.connect(lambda: self._open_anime_folder(anime))
+            menu.addAction(folder_action)
+            
+            menu.addSeparator()
+            
+            delete_action = QAction("🗑 删除记录", self)
+            delete_action.triggered.connect(lambda: self._delete_local_anime(anime))
+            menu.addAction(delete_action)
+        else:
+            # 历史动漫菜单
+            if anime.bangumi_url:
+                open_action = QAction("🔗 打开链接", self)
+                open_action.triggered.connect(lambda: webbrowser.open(anime.bangumi_url))
+                menu.addAction(open_action)
+                
+                copy_action = QAction("📋 复制链接", self)
+                copy_action.triggered.connect(lambda: self._copy_anime_link(anime))
+                menu.addAction(copy_action)
+                
+                menu.addSeparator()
+            
+            delete_action = QAction("🗑 删除历史", self)
+            delete_action.triggered.connect(lambda: self._delete_anime_history(anime))
+            menu.addAction(delete_action)
         
         menu.exec(QCursor.pos())
 
@@ -473,7 +852,7 @@ class LibraryPage(QWidget):
                     continue
                 
                 source_name = source_dir.name
-                if source_name not in ['jmcomic', 'picacg', 'wnacg', 'user']:
+                if source_name not in ['jmcomic', 'picacg', 'wnacg', 'kaobei', 'user']:
                     continue
                 
                 # Scan comics in this source directory
@@ -901,15 +1280,59 @@ class LibraryPage(QWidget):
         # Reload from file first (in case another instance modified it)
         self.anime_history_manager.reload()
         
-        # Get anime history
-        animes = self.anime_history_manager.get_all()
+        # Get anime history and local videos
+        history_animes = self.anime_history_manager.get_all()
+        local_anime_episodes = self.anime_history_manager.get_anime_with_local_episodes()
+        
+        # 合并历史动漫和本地视频
+        combined_animes = []
+        
+        # 添加本地视频动漫（优先显示）
+        for local_anime_data in local_anime_episodes:
+            anime_info = local_anime_data["anime"]
+            episodes = local_anime_data["episodes"]
+            
+            # 创建Anime对象，标记为本地
+            anime = Anime(
+                id=anime_info.get("id", ""),
+                name=anime_info.get("name", "未知动漫"),
+                cover_url=anime_info.get("cover_url", ""),
+                summary=anime_info.get("summary", ""),
+                tags=anime_info.get("tags", []),
+                year=anime_info.get("year", ""),
+                area=anime_info.get("area", ""),
+                source=anime_info.get("source", "dm569"),
+                status="local"  # 特殊标记表示本地视频
+            )
+            
+            # 添加本地剧集信息
+            anime.eps_count = len(episodes)
+            anime.added_time = datetime.fromisoformat(
+                max(ep.get("completed_time", "") for ep in episodes)
+            ) if episodes else datetime.now()
+            
+            combined_animes.append(anime)
+        
+        # 添加历史动漫（排除已有本地视频的）
+        local_anime_ids = {str(data["anime"].get("id", "")) for data in local_anime_episodes}
+        for anime in history_animes:
+            if str(anime.id) not in local_anime_ids:
+                combined_animes.append(anime)
+        
+        # 按添加时间排序
+        combined_animes.sort(key=lambda x: x.added_time or datetime.min, reverse=True)
         
         # Update the anime grid
         if self.anime_grid:
-            self.anime_grid.set_animes(animes)
+            self.anime_grid.set_animes(combined_animes)
         
         # Update count
-        self.anime_count_label.setText(f"{len(animes)} 部动漫")
+        local_count = len(local_anime_episodes)
+        history_count = len(history_animes)
+        if local_count > 0:
+            self.anime_count_label.setText(f"{len(combined_animes)} 部动漫 (本地: {local_count})")
+        else:
+            self.anime_count_label.setText(f"{len(combined_animes)} 部动漫")
     
     def add_anime_to_history(self, anime: Anime) -> None:
         """

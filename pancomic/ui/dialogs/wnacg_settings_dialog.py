@@ -177,8 +177,8 @@ class WNACGSettingsDialog(QDialog):
         """加载当前设置"""
         try:
             # 尝试获取当前域名
-            if hasattr(self.adapter.api.async_source, 'domain') and self.adapter.api.async_source.domain:
-                domain = self.adapter.api.async_source.domain
+            if hasattr(self.adapter.api, 'domain') and self.adapter.api.domain:
+                domain = self.adapter.api.domain
                 self.current_domain_display.setText(domain)
             else:
                 self.current_domain_display.setText("未初始化")
@@ -213,15 +213,15 @@ class WNACGSettingsDialog(QDialog):
         
         try:
             # 重新初始化适配器以获取新域名
-            old_domain = getattr(self.adapter.api.async_source, 'domain', '未知')
+            old_domain = getattr(self.adapter.api, 'domain', '未知')
             
             # 清除当前域名，强制重新获取
-            self.adapter.api.async_source.domain = None
+            self.adapter.api.domain = None
             
             # 执行一次搜索来触发域名获取
             result = self.adapter.search("test", 1)
             
-            new_domain = getattr(self.adapter.api.async_source, 'domain', '未知')
+            new_domain = getattr(self.adapter.api, 'domain', '未知')
             
             if new_domain and new_domain != old_domain:
                 self.current_domain_display.setText(new_domain)

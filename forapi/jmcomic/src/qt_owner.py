@@ -339,7 +339,16 @@ class QtOwner(Singleton):
                 f = QFont(Setting.FontName.value)
 
             if Setting.FontSize.value and Setting.FontSize.value != "Defalut":
-                f.setPointSize(int(Setting.FontSize.value))
+                try:
+                    font_size = int(Setting.FontSize.value)
+                    if font_size > 0:  # 确保字体大小为正数
+                        f.setPointSize(font_size)
+                    else:
+                        print(f"[JMComic] 无效的字体大小: {font_size}, 使用默认值")
+                        f.setPointSize(12)  # 使用默认字体大小
+                except (ValueError, TypeError) as e:
+                    print(f"[JMComic] 字体大小转换失败: {Setting.FontSize.value}, 错误: {e}")
+                    f.setPointSize(12)  # 使用默认字体大小
 
             if Setting.FontStyle.value:
                 fontStyleList = [QFont.Light, QFont.Normal, QFont.DemiBold, QFont.Bold, QFont.Black]

@@ -78,7 +78,7 @@ class ConfigManager:
         Get configuration for a specific comic source.
         
         Args:
-            source: Source name ('jmcomic', or 'picacg')
+            source: Source name ('jmcomic', 'picacg', 'wnacg', 'kaobei')
             
         Returns:
             Dictionary containing source-specific configuration
@@ -96,7 +96,7 @@ class ConfigManager:
         Update configuration for a specific comic source.
         
         Args:
-            source: Source name ('jmcomic', or 'picacg')
+            source: Source name ('jmcomic', 'picacg', 'wnacg', 'kaobei')
             config: Dictionary containing updated configuration
             
         Raises:
@@ -165,7 +165,7 @@ class ConfigManager:
             ValueError: If configuration is invalid
         """
         # Validate required top-level sections
-        required_sections = ['general', 'download', 'cache', 'jmcomic', 'picacg']
+        required_sections = ['general', 'download', 'cache']
         for section in required_sections:
             if section not in self.config:
                 raise ValueError(f"Missing required configuration section: {section}")
@@ -179,9 +179,10 @@ class ConfigManager:
         # Validate cache settings
         self._validate_cache_config()
         
-        # Validate source configurations
-        for source in ['jmcomic', 'picacg']:
-            self._validate_source_config(source)
+        # Validate source configurations (optional)
+        for source in ['jmcomic', 'picacg', 'wnacg', 'kaobei']:
+            if source in self.config:
+                self._validate_source_config(source)
     
     def _validate_general_config(self) -> None:
         """Validate general configuration section."""

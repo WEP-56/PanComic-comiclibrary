@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, Signal, Slot, QTimer
 from PySide6.QtGui import QPixmap
 
 from pancomic.infrastructure.download_manager import DownloadManager
-from pancomic.infrastructure.download_queue_manager import DownloadQueueManager, QueueItem
+from pancomic.infrastructure.comic_queue_manager import ComicQueueManager, QueueItem
 from pancomic.models.download_task import DownloadTask
 
 
@@ -214,13 +214,13 @@ class QueueTaskCard(QFrame):
 class DownloadPage(QWidget):
     """Download management page with downloading and queue sections."""
     
-    # Signal to request download start (QueueItem data as dict)
+    # Signal to request download start (DownloadTask data as dict)
     start_download_requested = Signal(dict)
     
     def __init__(self, download_manager: DownloadManager, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.download_manager = download_manager
-        self.queue_manager = DownloadQueueManager()
+        self.queue_manager = ComicQueueManager()
         self.downloading_widgets: Dict[str, DownloadingTaskCard] = {}
         self.queue_widgets: Dict[str, QueueTaskCard] = {}
         self._checked_items: Set[str] = set()

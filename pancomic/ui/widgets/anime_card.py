@@ -153,6 +153,40 @@ class AnimeCard(QWidget):
         """)
         cover_layout.addWidget(self.cover_label)
         
+        # 来源标识标签 (左上角)
+        self.source_label = QLabel()
+        self.source_label.setParent(self.cover_container)
+        self.source_label.setFixedSize(50, 20)
+        self.source_label.move(8, 8)  # 左上角位置
+        
+        # 根据来源设置标签内容和样式
+        if self.anime.source == "dm569":
+            self.source_label.setText("视频")
+            self.source_label.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(0, 120, 212, 0.9);
+                    color: white;
+                    font-size: 10px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                    padding: 2px 4px;
+                }
+            """)
+        else:  # bangumi 来源
+            self.source_label.setText("WIKI")
+            self.source_label.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(76, 175, 80, 0.9);
+                    color: white;
+                    font-size: 10px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                    padding: 2px 4px;
+                }
+            """)
+        
+        self.source_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
         layout.addWidget(self.cover_container)
         
         # Separator line
@@ -165,20 +199,34 @@ class AnimeCard(QWidget):
         info_layout.setContentsMargins(8, 4, 8, 4)
         info_layout.setSpacing(8)
         
-        # Date
-        date_text = self.anime.air_date if self.anime.air_date else "未知"
+        # Date or Year
+        date_text = ""
+        if self.anime.air_date:
+            date_text = self.anime.air_date
+        elif self.anime.year:
+            date_text = self.anime.year
+        else:
+            date_text = "未知"
+        
         self.date_label = QLabel(f"📅 {date_text}")
         self.date_label.setStyleSheet("color: #aaaaaa; font-size: 11px; background: transparent;")
         info_layout.addWidget(self.date_label)
         
         info_layout.addStretch()
         
-        # Episodes
-        eps_text = f"{self.anime.eps_count}集" if self.anime.eps_count > 0 else ""
-        if eps_text:
-            self.eps_label = QLabel(f"🎬 {eps_text}")
-            self.eps_label.setStyleSheet("color: #aaaaaa; font-size: 11px; background: transparent;")
-            info_layout.addWidget(self.eps_label)
+        # Episodes or Area
+        right_text = ""
+        if self.anime.eps_count > 0:
+            right_text = f"🎬 {self.anime.eps_count}集"
+        elif self.anime.area:
+            right_text = f"🌍 {self.anime.area}"
+        elif self.anime.source == "dm569":
+            right_text = "🎥 视频"
+        
+        if right_text:
+            self.info_right_label = QLabel(right_text)
+            self.info_right_label.setStyleSheet("color: #aaaaaa; font-size: 11px; background: transparent;")
+            info_layout.addWidget(self.info_right_label)
         
         layout.addWidget(info_bar)
         
@@ -328,8 +376,20 @@ class AnimeCard(QWidget):
         painter = QPainter(result)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Draw rank badge (top-left)
-        if self.anime.rank > 0:
+        # Draw rank badge (top-left) or local badge
+        if self.anime.status == "local":
+            # 本地视频标识
+            badge_color = QColor("#107c10")  # 绿色
+            painter.setBrush(badge_color)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(8, 8, 40, 24, 4, 4)
+            
+            painter.setPen(QColor("#ffffff"))
+            font = QFont("Segoe UI", 9, QFont.Weight.Bold)
+            painter.setFont(font)
+            painter.drawText(8, 8, 40, 24, Qt.AlignmentFlag.AlignCenter, "本地")
+        elif self.anime.rank > 0:
+            # 排名标识
             badge_color = QColor("#0078d4")
             painter.setBrush(badge_color)
             painter.setPen(Qt.PenStyle.NoPen)
@@ -453,7 +513,11 @@ class AnimeCard(QWidget):
         if hasattr(self, 'date_label'):
             self.date_label.setStyleSheet(f"color: {text_secondary}; font-size: 11px; background: transparent;")
         
-        # Episodes label
+        # Right info label (episodes/area)
+        if hasattr(self, 'info_right_label'):
+            self.info_right_label.setStyleSheet(f"color: {text_secondary}; font-size: 11px; background: transparent;")
+        
+        # Episodes label (legacy)
         if hasattr(self, 'eps_label'):
             self.eps_label.setStyleSheet(f"color: {text_secondary}; font-size: 11px; background: transparent;")
         

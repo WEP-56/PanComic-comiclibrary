@@ -285,13 +285,30 @@ class ImageLoadManager(QObject):
     
     def cleanup(self):
         """清理资源"""
-        self.clear_queue()
+        print("[INFO] ImageLoadManager cleanup started...")
         
-        if self._worker_thread and self._worker_thread.isRunning():
-            # 清理工作线程
-            self._worker.cleanup()
-            self._worker_thread.quit()
-            self._worker_thread.wait(3000)  # 等待最多3秒
+        try:
+            self.clear_queue()
+        except Exception as e:
+            print(f"[ERROR] Error clearing queue: {e}")
+        
+        try:
+            if hasattr(self, '_worker_thread') and self._worker_thread and self._worker_thread.isRunning():
+                print("[INFO] Stopping image worker thread...")
+                # 清理工作线程
+                if hasattr(self, '_worker') and self._worker:
+                    self._worker.cleanup()
+                
+                self._worker_thread.quit()
+                if not self._worker_thread.wait(3000):  # 等待最多3秒
+                    print("[WARN] Image worker thread did not stop gracefully, terminating...")
+                    self._worker_thread.terminate()
+                    self._worker_thread.wait(1000)
+                print("[INFO] Image worker thread stopped")
+        except Exception as e:
+            print(f"[ERROR] Error stopping image worker thread: {e}")
+        
+        print("[INFO] ImageLoadManager cleanup completed")
 
 
 class WNACGSearchWorker(QObject):
@@ -410,6 +427,9 @@ class WNACGPage(QWidget):
         
         # Setup worker thread
         self._setup_worker_thread()
+        
+        # Apply initial theme
+        self.apply_theme('dark')
     
     def _on_image_loaded(self, label: QLabel, pixmap):
         """处理图片加载完成"""
@@ -451,11 +471,7 @@ class WNACGPage(QWidget):
         # Split view: Left (results) | Right (details)
         splitter = QSplitter(Qt.Horizontal)
         splitter.setHandleWidth(1)
-        splitter.setStyleSheet("""
-            QSplitter::handle {
-                background-color: #3a3a3a;
-            }
-        """)
+        splitter.setObjectName("mainSplitter")  # 使用对象名，通过主题样式控制
         
         # Left panel: Search results
         self.results_panel = self._create_results_panel()
@@ -474,12 +490,7 @@ class WNACGPage(QWidget):
         """Create the search bar component."""
         search_container = QWidget()
         search_container.setFixedHeight(60)
-        search_container.setStyleSheet("""
-            QWidget {
-                background-color: #2b2b2b;
-                border-bottom: 1px solid #3a3a3a;
-            }
-        """)
+        # 移除硬编码样式，使用apply_theme方法控制
         
         layout = QHBoxLayout(search_container)
         layout.setContentsMargins(20, 10, 20, 10)
@@ -503,7 +514,7 @@ class WNACGPage(QWidget):
         
         # Status label
         self.status_label = QLabel("就绪")
-        self.status_label.setStyleSheet("color: #888888; font-weight: bold; margin-left: 20px;")
+        # 移除硬编码样式
         
         layout.addWidget(self.search_bar)
         layout.addWidget(self.search_button)
@@ -515,48 +526,25 @@ class WNACGPage(QWidget):
     def _create_results_panel(self) -> QWidget:
         """Create the left results panel."""
         panel = QWidget()
-        panel.setStyleSheet("background-color: #1e1e1e;")
+        # 移除硬编码样式，使用apply_theme控制
         
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
         
-        # Results header
+        # Results header - 遵循jmcomic标准格式
         header_layout = QHBoxLayout()
         self.results_label = QLabel("搜索结果")
-        self.results_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffffff;")
-        
-        self.results_count_label = QLabel("")
-        self.results_count_label.setStyleSheet("color: #888888;")
-        
         header_layout.addWidget(self.results_label)
         header_layout.addStretch()
-        header_layout.addWidget(self.results_count_label)
+        layout.addLayout(header_layout)
         
         # Scroll area for results
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background-color: transparent;
-            }
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                border-radius: 6px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #555555;
-                border-radius: 6px;
-                min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: #666666;
-            }
-        """)
+        scroll.setObjectName("resultsScrollArea")  # 使用对象名，通过主题样式控制
         
         # 监听滚动事件
         scroll.verticalScrollBar().valueChanged.connect(self._on_scroll_changed)
@@ -570,27 +558,20 @@ class WNACGPage(QWidget):
         # 存储滚动区域引用
         self.results_scroll_area = scroll
         
-        # Pagination controls
+        # Pagination controls - 遵循jmcomic标准格式
         pagination_layout = QHBoxLayout()
         self.prev_button = QPushButton("上一页")
-        self.prev_button.setFixedHeight(35)
+        self.prev_button.setFixedHeight(32)  # 与jmcomic保持一致
         self.prev_button.setEnabled(False)
         self.prev_button.clicked.connect(self._on_prev_page)
         
         self.page_label = QLabel("第 1 页")
         self.page_label.setAlignment(Qt.AlignCenter)
-        self.page_label.setStyleSheet("color: #ffffff; font-weight: bold;")
         
         self.next_button = QPushButton("下一页")
-        self.next_button.setFixedHeight(35)
+        self.next_button.setFixedHeight(32)  # 与jmcomic保持一致
         self.next_button.setEnabled(False)
         self.next_button.clicked.connect(self._on_next_page)
-        
-        # Load more button (for lazy loading)
-        self.load_more_button = QPushButton("加载更多")
-        self.load_more_button.setFixedHeight(35)
-        self.load_more_button.setVisible(False)
-        self.load_more_button.clicked.connect(self._on_load_more)
         
         pagination_layout.addWidget(self.prev_button)
         pagination_layout.addStretch()
@@ -601,14 +582,14 @@ class WNACGPage(QWidget):
         layout.addLayout(header_layout)
         layout.addWidget(scroll)
         layout.addLayout(pagination_layout)
-        layout.addWidget(self.load_more_button)
+        # 删除了加载更多按钮
         
         return panel
     
     def _create_details_panel(self) -> QWidget:
         """Create the right details panel."""
         panel = QWidget()
-        panel.setStyleSheet("background-color: #252525;")
+        # 移除硬编码样式
         
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -617,11 +598,7 @@ class WNACGPage(QWidget):
         # Placeholder
         self.details_placeholder = QLabel("← 选择一个漫画查看详情")
         self.details_placeholder.setAlignment(Qt.AlignCenter)
-        self.details_placeholder.setStyleSheet("""
-            color: #888888;
-            font-size: 16px;
-            font-style: italic;
-        """)
+        self.details_placeholder.setObjectName("detailsPlaceholder")  # 使用对象名，通过主题样式控制
         
         # Details content (initially hidden)
         self.details_content = QWidget()
@@ -634,42 +611,31 @@ class WNACGPage(QWidget):
         self.cover_label = QLabel()
         self.cover_label.setFixedSize(200, 267)
         self.cover_label.setAlignment(Qt.AlignCenter)
-        self.cover_label.setStyleSheet("""
-            border: 2px solid #3a3a3a;
-            border-radius: 8px;
-            background-color: #1e1e1e;
-            color: #888888;
-        """)
+        self.cover_label.setObjectName("coverLabel")  # 使用对象名，通过主题样式控制
         self.cover_label.setText("加载中...")
         
         # Title
         self.title_label = QLabel()
         self.title_label.setWordWrap(True)
-        self.title_label.setStyleSheet("""
-            font-size: 16px;
-            font-weight: bold;
-            color: #ffffff;
-            margin-bottom: 5px;
-        """)
+        self.title_label.setObjectName("titleLabel")  # 使用对象名，通过主题样式控制
         
         # Info labels
-        info_style = "color: #cccccc; margin-bottom: 3px;"
         self.author_label = QLabel()
-        self.author_label.setStyleSheet(info_style)
+        self.author_label.setObjectName("infoLabel")  # 使用对象名，通过主题样式控制
         
         self.category_label = QLabel()
-        self.category_label.setStyleSheet(info_style)
+        self.category_label.setObjectName("infoLabel")  # 使用对象名，通过主题样式控制
         
         self.pages_label = QLabel()
-        self.pages_label.setStyleSheet(info_style)
+        self.pages_label.setObjectName("infoLabel")  # 使用对象名，通过主题样式控制
         
         self.id_label = QLabel()
-        self.id_label.setStyleSheet("color: #888888; font-size: 12px;")
+        self.id_label.setObjectName("infoLabel")  # 使用对象名，通过主题样式控制
         
         # Tags
         self.tags_label = QLabel()
         self.tags_label.setWordWrap(True)
-        self.tags_label.setStyleSheet("color: #66ccff; margin-top: 5px;")
+        self.tags_label.setObjectName("infoLabel")  # 使用对象名，通过主题样式控制
         
         # Action buttons
         buttons_layout = QHBoxLayout()
@@ -678,73 +644,19 @@ class WNACGPage(QWidget):
         self.read_button = QPushButton("阅读")
         self.read_button.setFixedHeight(40)
         self.read_button.setEnabled(False)  # 初始禁用
-        self.read_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-            QPushButton:pressed {
-                background-color: #3d8b40;
-            }
-            QPushButton:disabled {
-                background-color: #666666;
-                color: #999999;
-            }
-        """)
+        self.read_button.setObjectName("actionButton")  # 使用对象名，通过主题样式控制
         self.read_button.clicked.connect(self._on_read_clicked)
         
         self.download_button = QPushButton("下载")
         self.download_button.setFixedHeight(40)
         self.download_button.setEnabled(False)  # 初始禁用
-        self.download_button.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-            QPushButton:pressed {
-                background-color: #1565C0;
-            }
-            QPushButton:disabled {
-                background-color: #666666;
-                color: #999999;
-            }
-        """)
+        self.download_button.setObjectName("actionButton")  # 使用对象名，通过主题样式控制
         self.download_button.clicked.connect(self._on_download_clicked)
         
         self.queue_button = QPushButton("加入队列")
         self.queue_button.setFixedHeight(40)
         self.queue_button.setEnabled(False)  # 初始禁用
-        self.queue_button.setStyleSheet("""
-            QPushButton {
-                background-color: #FF9800;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #F57C00;
-            }
-            QPushButton:pressed {
-                background-color: #E65100;
-            }
-            QPushButton:disabled {
-                background-color: #666666;
-                color: #999999;
-            }
-        """)
+        self.queue_button.setObjectName("actionButton")  # 使用对象名，通过主题样式控制
         self.queue_button.clicked.connect(self._on_queue_clicked)
         
         buttons_layout.addWidget(self.read_button)
@@ -773,18 +685,7 @@ class WNACGPage(QWidget):
         card = QFrame()
         card.setFixedHeight(80)
         card.setCursor(Qt.PointingHandCursor)
-        card.setStyleSheet("""
-            QFrame {
-                background-color: #2b2b2b;
-                border: 1px solid #3a3a3a;
-                border-radius: 6px;
-                margin: 2px;
-            }
-            QFrame:hover {
-                background-color: #333333;
-                border-color: #4a4a4a;
-            }
-        """)
+        card.setObjectName("resultCard")  # 使用对象名，通过主题样式控制
         
         # Store comic reference
         card.comic = comic
@@ -803,13 +704,7 @@ class WNACGPage(QWidget):
         thumb = QLabel()
         thumb.setFixedSize(45, 60)
         thumb.setAlignment(Qt.AlignCenter)
-        thumb.setStyleSheet("""
-            border: 1px solid #555555;
-            border-radius: 4px;
-            background-color: #1e1e1e;
-            color: #888888;
-            font-size: 10px;
-        """)
+        thumb.setObjectName("thumbLabel")  # 使用对象名，通过主题样式控制
         thumb.setText("加载中...")
         
         # Request thumbnail loading (lazy loading)
@@ -826,18 +721,11 @@ class WNACGPage(QWidget):
         title = QLabel(comic.title)
         title.setMaximumHeight(36)
         title.setWordWrap(True)
-        title.setStyleSheet("""
-            color: #ffffff;
-            font-weight: bold;
-            font-size: 13px;
-        """)
+        title.setObjectName("cardTitle")  # 使用对象名，通过主题样式控制
         
         # Description/pages info
         desc = QLabel(comic.description or f"ID: {comic.id}")
-        desc.setStyleSheet("""
-            color: #cccccc;
-            font-size: 11px;
-        """)
+        desc.setObjectName("cardDescription")  # 使用对象名，通过主题样式控制
         
         info_layout.addWidget(title)
         info_layout.addWidget(desc)
@@ -902,11 +790,6 @@ class WNACGPage(QWidget):
         self._current_page += 1
         self._perform_search()
     
-    def _on_load_more(self):
-        """Handle load more button click."""
-        self._current_page += 1
-        self._perform_search(append_results=True)
-    
     def _perform_search(self, append_results=False):
         """Perform search with current parameters."""
         if not self._current_keyword:
@@ -917,7 +800,6 @@ class WNACGPage(QWidget):
         
         self.status_label.setText("搜索中...")
         self.search_button.setEnabled(False)
-        self.load_more_button.setEnabled(False)
         
         self._search_requested.emit(self._current_keyword, self._current_page)
     
@@ -985,9 +867,9 @@ class WNACGPage(QWidget):
         # Update pagination
         self._update_pagination(max_page)
         
-        # Update results count
+        # Update results label - 遵循jmcomic标准格式
         total_results = len(self._all_comics)
-        self.results_count_label.setText(f"共 {total_results} 个结果")
+        self.results_label.setText(f"搜索结果 ({total_results} 个)")
         
         # 延迟加载初始可见的图片
         QTimer.singleShot(300, self._load_visible_images)
@@ -1055,7 +937,7 @@ class WNACGPage(QWidget):
         # Reset state
         self._all_comics = []
         self._current_display_count = 0
-        self.results_count_label.setText("")
+        self.results_label.setText("搜索结果")
     
     def _display_results(self, comics: List[Comic]):
         """Display search results with lazy loading."""
@@ -1075,12 +957,7 @@ class WNACGPage(QWidget):
         self.prev_button.setEnabled(self._current_page > 1)
         self.next_button.setEnabled(self._current_page < max_page)
         
-        # Show/hide load more button
-        if self._current_page < max_page:
-            self.load_more_button.setVisible(True)
-            self.load_more_button.setEnabled(True)
-        else:
-            self.load_more_button.setVisible(False)
+        # 删除了加载更多按钮的相关逻辑
     
     def apply_theme(self, theme: str):
         """Apply theme to the page."""
@@ -1090,10 +967,14 @@ class WNACGPage(QWidget):
             # Light theme colors
             bg_primary = '#FFFFFF'
             bg_secondary = '#F5F5F5'
-            bg_tertiary = '#E0E0E0'
+            bg_tertiary = '#FAFAFA'
             text_primary = '#000000'
-            text_secondary = '#666666'
-            border_color = '#CCCCCC'
+            text_secondary = '#333333'
+            text_muted = '#666666'
+            border_color = '#E0E0E0'
+            accent_color = '#0078D4'
+            card_bg = '#FFFFFF'
+            card_hover = '#F0F0F0'
         else:
             # Dark theme colors (default)
             bg_primary = '#1e1e1e'
@@ -1101,17 +982,272 @@ class WNACGPage(QWidget):
             bg_tertiary = '#252525'
             text_primary = '#ffffff'
             text_secondary = '#cccccc'
+            text_muted = '#888888'
             border_color = '#3a3a3a'
+            accent_color = '#0078d4'
+            card_bg = '#2b2b2b'
+            card_hover = '#333333'
         
-        # Apply theme styles (implementation would update all component styles)
-        # This is a simplified version - full implementation would update all components
-        pass
+        # Apply theme styles to the entire page
+        self.setStyleSheet(f"""
+            /* 主容器 */
+            QWidget {{
+                background-color: {bg_primary};
+                color: {text_primary};
+            }}
+            
+            /* 分割器 */
+            #mainSplitter::handle {{
+                background-color: {border_color};
+            }}
+            
+            /* 滚动区域 */
+            #resultsScrollArea {{
+                border: none;
+                background-color: transparent;
+            }}
+            
+            /* 搜索栏 */
+            QLineEdit {{
+                background-color: {bg_primary};
+                border: 1px solid {border_color};
+                border-radius: 6px;
+                padding: 8px 12px;
+                color: {text_primary};
+                font-size: 14px;
+            }}
+            QLineEdit:focus {{
+                border-color: {accent_color};
+            }}
+            
+            /* 搜索按钮和设置按钮 */
+            QPushButton {{
+                background-color: {accent_color};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 8px 16px;
+            }}
+            QPushButton:hover {{
+                background-color: #1084d8;
+            }}
+            QPushButton:pressed {{
+                background-color: #006cbd;
+            }}
+            QPushButton:disabled {{
+                background-color: {text_muted};
+                color: #a0aec0;
+            }}
+            
+            /* 操作按钮 - 使用更强的选择器和!important强制应用 */
+            QPushButton#actionButton {{
+                background-color: {accent_color} !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 6px !important;
+                font-weight: bold !important;
+                font-size: 14px !important;
+                padding: 8px 16px !important;
+                min-width: 60px !important;
+                min-height: 32px !important;
+            }}
+            QPushButton#actionButton:hover {{
+                background-color: #1084d8 !important;
+            }}
+            QPushButton#actionButton:pressed {{
+                background-color: #006cbd !important;
+            }}
+            QPushButton#actionButton:disabled {{
+                background-color: {text_muted} !important;
+                color: #a0aec0 !important;
+            }}
+            
+            /* 结果卡片 - 添加淡色边框来区分卡片 */
+            #resultCard {{
+                background-color: {card_bg};
+                border: 1px solid {border_color};
+                border-radius: 6px;
+            }}
+            #resultCard:hover {{
+                background-color: {card_hover};
+            }}
+            
+            /* 卡片标题 */
+            #cardTitle {{
+                color: {text_primary};
+                font-weight: bold;
+                font-size: 13px;
+                border: none;
+            }}
+            
+            /* 卡片描述 */
+            #cardDescription {{
+                color: {text_secondary};
+                font-size: 11px;
+                border: none;
+            }}
+            
+            /* 缩略图 - 移除边框 */
+            #thumbLabel {{
+                background-color: {bg_secondary};
+                border: none;
+                border-radius: 4px;
+                color: {text_muted};
+                font-size: 10px;
+            }}
+            
+            /* 封面图片 - 移除边框 */
+            #coverLabel {{
+                background-color: {bg_secondary};
+                border: none;
+                border-radius: 8px;
+                color: {text_muted};
+            }}
+            
+            /* 标题标签 */
+            #titleLabel {{
+                color: {text_primary};
+                font-size: 16px;
+                font-weight: bold;
+                border: none;
+                margin-bottom: 5px;
+            }}
+            
+            /* 信息标签 */
+            #infoLabel {{
+                color: {text_secondary};
+                border: none;
+                margin-bottom: 3px;
+            }}
+            
+            /* 详情占位符 */
+            #detailsPlaceholder {{
+                color: {text_muted};
+                font-size: 16px;
+                font-style: italic;
+                border: none;
+            }}
+            
+            /* 标签 - 移除所有边框 */
+            QLabel {{
+                color: {text_primary};
+                background: transparent;
+                border: none;
+            }}
+            
+            /* 滚动条 */
+            QScrollBar:vertical {{
+                background-color: {bg_secondary};
+                width: 12px;
+                border-radius: 6px;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {border_color};
+                border-radius: 6px;
+                min-height: 20px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: {text_muted};
+            }}
+        """)
+        
+        # 应用面板样式 - 遵循jmcomic标准
+        if hasattr(self, 'results_panel'):
+            self.results_panel.setStyleSheet(f"background-color: {bg_primary};")
+        
+        if hasattr(self, 'details_panel'):
+            self.details_panel.setStyleSheet(f"background-color: {bg_tertiary};")
+        
+        # 应用分页按钮样式 - 遵循jmcomic标准
+        pagination_style = f"""
+            QPushButton {{
+                background-color: {border_color};
+                border: none;
+                border-radius: 4px;
+                color: {text_primary};
+                padding: 0 20px;
+            }}
+            QPushButton:hover:enabled {{
+                background-color: {text_muted};
+            }}
+            QPushButton:disabled {{
+                color: {text_muted};
+            }}
+        """
+        
+        if hasattr(self, 'prev_button'):
+            self.prev_button.setStyleSheet(pagination_style)
+        if hasattr(self, 'next_button'):
+            self.next_button.setStyleSheet(pagination_style)
+        
+        # 应用页码标签样式
+        if hasattr(self, 'page_label'):
+            self.page_label.setStyleSheet(f"color: {text_primary};")
+        
+        # 直接为操作按钮设置样式 - 确保样式被应用
+        action_button_style = f"""
+            QPushButton {{
+                background-color: {accent_color};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 8px 16px;
+                min-width: 60px;
+                min-height: 32px;
+            }}
+            QPushButton:hover {{
+                background-color: #1084d8;
+            }}
+            QPushButton:pressed {{
+                background-color: #006cbd;
+            }}
+            QPushButton:disabled {{
+                background-color: {text_muted};
+                color: #a0aec0;
+            }}
+        """
+        
+        if hasattr(self, 'read_button'):
+            self.read_button.setStyleSheet(action_button_style)
+        if hasattr(self, 'download_button'):
+            self.download_button.setStyleSheet(action_button_style)
+        if hasattr(self, 'queue_button'):
+            self.queue_button.setStyleSheet(action_button_style)
     
     def cleanup(self):
         """Cleanup resources when page is destroyed."""
-        if self._worker_thread and self._worker_thread.isRunning():
-            self._worker_thread.quit()
-            self._worker_thread.wait()
+        print("[INFO] WNACGPage cleanup started...")
         
-        if self._image_manager:
-            self._image_manager.cleanup()
+        try:
+            # 停止工作线程
+            if hasattr(self, '_worker_thread') and self._worker_thread and self._worker_thread.isRunning():
+                print("[INFO] Stopping worker thread...")
+                # 先断开信号连接，防止清理过程中触发信号
+                if hasattr(self, '_worker') and self._worker:
+                    self._worker.search_completed.disconnect()
+                    self._worker.search_failed.disconnect()
+                    self._worker.details_completed.disconnect()
+                    self._worker.details_failed.disconnect()
+                
+                self._worker_thread.quit()
+                if not self._worker_thread.wait(3000):  # 等待最多3秒
+                    print("[WARN] Worker thread did not stop gracefully, terminating...")
+                    self._worker_thread.terminate()
+                    self._worker_thread.wait(1000)  # 再等1秒
+                print("[INFO] Worker thread stopped")
+        except Exception as e:
+            print(f"[ERROR] Error stopping worker thread: {e}")
+        
+        try:
+            # 清理图片管理器
+            if hasattr(self, '_image_manager') and self._image_manager:
+                print("[INFO] Cleaning up image manager...")
+                self._image_manager.cleanup()
+        except Exception as e:
+            print(f"[ERROR] Error cleaning up image manager: {e}")
+        
+        print("[INFO] WNACGPage cleanup completed")

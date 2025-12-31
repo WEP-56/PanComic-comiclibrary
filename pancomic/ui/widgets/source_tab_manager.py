@@ -133,10 +133,27 @@ class SourceTabManager(QObject):
         """移除动态页面"""
         if key in self._pages:
             page = self._pages.pop(key)
+            
+            # 在删除页面前先调用cleanup方法清理资源
+            if hasattr(page, 'cleanup'):
+                try:
+                    print(f"🧹 清理页面资源: {key}")
+                    page.cleanup()
+                except Exception as e:
+                    print(f"⚠️ 页面清理时出错 {key}: {e}")
+            
+            # 从堆栈中移除页面
             if self.stacked_widget:
                 self.stacked_widget.removeWidget(page)
-            page.deleteLater()
-            print(f"🗑️ 移除页面: {key}")
+            
+            # 延迟删除页面对象
+            try:
+                page.deleteLater()
+                print(f"🗑️ 移除页面: {key}")
+            except Exception as e:
+                print(f"❌ 删除页面时出错 {key}: {e}")
+        else:
+            print(f"⚠️ 尝试移除不存在的页面: {key}")
     
     def is_page_created(self, key: str) -> bool:
         """检查页面是否已创建"""

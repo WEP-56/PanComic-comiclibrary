@@ -28,7 +28,7 @@ def parse_arguments():
     parser.add_argument(
         '--version',
         action='version',
-        version='PanComic 0.1.0'
+        version='PanComic 0.3.0'
     )
     
     return parser.parse_args()

@@ -31,7 +31,7 @@ class Chapter:
             raise ValueError("Chapter title must be a non-empty string")
         
         # Validate source
-        valid_sources = ["jmcomic", "picacg", "wnacg", "user"]
+        valid_sources = ["jmcomic", "picacg", "wnacg", "kaobei", "user"]
         if self.source not in valid_sources:
             raise ValueError(f"Chapter source must be one of {valid_sources}, got '{self.source}'")
         

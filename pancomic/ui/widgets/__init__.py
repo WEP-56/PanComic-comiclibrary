@@ -7,6 +7,7 @@ from pancomic.ui.widgets.anime_card import AnimeCard
 from pancomic.ui.widgets.anime_grid import AnimeGrid
 from pancomic.ui.widgets.dynamic_tab_bar import DynamicTabBar, SourceSelectorDialog
 from pancomic.ui.widgets.source_tab_manager import SourceTabManager
+from pancomic.ui.widgets.version_manager import VersionManagerWidget
 
 __all__ = [
     'LoadingWidget',
@@ -17,4 +18,5 @@ __all__ = [
     'DynamicTabBar',
     'SourceSelectorDialog',
     'SourceTabManager',
+    'VersionManagerWidget',
 ]

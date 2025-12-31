@@ -15,6 +15,7 @@ from pancomic.adapters.picacg_adapter import PicACGAdapter
 from pancomic.adapters.jmcomic_adapter import JMComicAdapter
 from pancomic.adapters.ehentai_adapter import EHentaiAdapter
 from pancomic.adapters.wnacg_adapter import WNACGAdapter
+from pancomic.adapters.kaobei_adapter import KaobeiAdapter
 
 
 class SettingsPage(QWidget):
@@ -33,6 +34,7 @@ class SettingsPage(QWidget):
                  jmcomic_adapter: Optional[JMComicAdapter] = None,
                  ehentai_adapter: Optional[EHentaiAdapter] = None,
                  wnacg_adapter: Optional[WNACGAdapter] = None,
+                 kaobei_adapter: Optional[KaobeiAdapter] = None,
                  parent: Optional[QWidget] = None):
         """
         初始化设置页面
@@ -43,6 +45,7 @@ class SettingsPage(QWidget):
             jmcomic_adapter: JMComic适配器  
             ehentai_adapter: EHentai适配器
             wnacg_adapter: WNACG适配器
+            kaobei_adapter: Kaobei适配器
             parent: 父窗口
         """
         super().__init__(parent)
@@ -52,6 +55,7 @@ class SettingsPage(QWidget):
         self.jmcomic_adapter = jmcomic_adapter
         self.ehentai_adapter = ehentai_adapter
         self.wnacg_adapter = wnacg_adapter
+        self.kaobei_adapter = kaobei_adapter
         
         self._setup_ui()
         self._load_settings()
@@ -97,8 +101,9 @@ class SettingsPage(QWidget):
             "PicACG",
             "JMComic", 
             "绅士漫画",
+            "拷贝漫画",
             "下载设置",
-            "使用须知"
+            "版本检测"
         ]
         
         for item_text in nav_items:
@@ -121,8 +126,9 @@ class SettingsPage(QWidget):
         self.pages['picacg'] = self._create_picacg_page()
         self.pages['jmcomic'] = self._create_jmcomic_page()
         self.pages['wnacg'] = self._create_wnacg_page()
+        self.pages['kaobei'] = self._create_kaobei_page()
         self.pages['download'] = self._create_download_page()
-        self.pages['tips'] = self._create_tips_page()
+        self.pages['tips'] = self._create_version_page()
         
         # 添加页面到堆栈
         for page in self.pages.values():
@@ -644,7 +650,7 @@ class SettingsPage(QWidget):
         
         # 标题
         title = QLabel("绅士漫画 (WNACG) 设置")
-        title.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px;")
+        # 移除硬编码样式，使用apply_theme控制
         layout.addWidget(title)
         
         # 说明文本
@@ -679,16 +685,7 @@ class SettingsPage(QWidget):
         current_domain_layout.addWidget(QLabel("当前域名:"))
         
         self.wnacg_domain_label = QLabel("自动获取中...")
-        self.wnacg_domain_label.setStyleSheet("""
-            QLabel {
-                background-color: #f0f0f0;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-                padding: 8px;
-                font-family: monospace;
-                min-width: 200px;
-            }
-        """)
+        # 移除硬编码样式，使用apply_theme控制
         current_domain_layout.addWidget(self.wnacg_domain_label)
         current_domain_layout.addStretch()
         domain_layout.addLayout(current_domain_layout)
@@ -696,7 +693,7 @@ class SettingsPage(QWidget):
         # 域名状态标签
         self.wnacg_domain_status = QLabel("点击按钮测试域名状态")
         self.wnacg_domain_status.setWordWrap(True)
-        self.wnacg_domain_status.setStyleSheet("color: #666666; font-size: 12px; margin: 5px 0;")
+        # 移除硬编码样式，使用apply_theme控制
         domain_layout.addWidget(self.wnacg_domain_status)
         
         # 域名操作按钮
@@ -767,12 +764,135 @@ class SettingsPage(QWidget):
         
         return page
     
+    def _create_kaobei_page(self) -> QWidget:
+        """创建拷贝漫画设置页面"""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
+        
+        # 标题
+        title = QLabel("拷贝漫画 (Kaobei) 设置")
+        # 移除硬编码样式，使用apply_theme控制
+        layout.addWidget(title)
+        
+        # 说明文本
+        info_text = QLabel(
+            "拷贝漫画是一个综合性漫画站：\n"
+            "• 无需登录即可使用\n"
+            "• 反爬强度较高，pancomic需要很多解密解析的流程，低性能pc使用拷贝漫画搜索会遇到卡顿3-4秒的情况"
+        )
+        info_text.setWordWrap(True)
+        info_text.setStyleSheet("""
+            QLabel {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 15px;
+                font-size: 13px;
+                color: #495057;
+                line-height: 1.5;
+            }
+        """)
+        layout.addWidget(info_text)
+        
+        # 域名设置组
+        domain_group = QGroupBox("域名设置")
+        domain_layout = QVBoxLayout(domain_group)
+        
+        # API域名显示
+        api_domain_layout = QHBoxLayout()
+        api_domain_layout.addWidget(QLabel("API域名:"))
+        
+        self.kaobei_api_domain_label = QLabel("api.2025copy.com")
+        # 移除硬编码样式，使用apply_theme控制
+        api_domain_layout.addWidget(self.kaobei_api_domain_label)
+        api_domain_layout.addStretch()
+        domain_layout.addLayout(api_domain_layout)
+        
+        # PC域名显示
+        pc_domain_layout = QHBoxLayout()
+        pc_domain_layout.addWidget(QLabel("PC域名:"))
+        
+        self.kaobei_pc_domain_label = QLabel("www.2025copy.com")
+        # 移除硬编码样式，使用apply_theme控制
+        pc_domain_layout.addWidget(self.kaobei_pc_domain_label)
+        pc_domain_layout.addStretch()
+        domain_layout.addLayout(pc_domain_layout)
+        
+        # 域名状态标签
+        self.kaobei_domain_status = QLabel("拷贝漫画使用固定域名，通常无需更改")
+        self.kaobei_domain_status.setWordWrap(True)
+        # 移除硬编码样式，使用apply_theme控制
+        domain_layout.addWidget(self.kaobei_domain_status)
+        
+        layout.addWidget(domain_group)
+        
+        # 搜索功能说明组
+        search_group = QGroupBox("搜索功能说明")
+        search_layout = QVBoxLayout(search_group)
+        
+        search_text = QLabel(
+            "• 普通搜索：直接输入漫画名称或关键词\n"
+            "• 更新搜索：输入\"更新\"查看最新更新的漫画\n"
+            "• 排名搜索：输入\"排名\"查看人气排行榜\n"
+            "  - 时间范围：排名日、排名周、排名月、排名总\n"
+            "  - 受众类型：排名男、排名女\n"
+            "  - 内容类型：排名轻小说\n"
+            "• 组合搜索：如\"排名日男\"表示日榜男性向排行"
+            "• 上述方法搜索如果不生效，大概率是触发了反爬，可以换一个代理节点使用"
+        )
+        search_text.setWordWrap(True)
+        search_text.setStyleSheet("""
+            QLabel {
+                background-color: #e9ecef;
+                border: 1px solid #ced4da;
+                border-radius: 6px;
+                padding: 12px;
+                font-size: 13px;
+                color: #495057;
+                line-height: 1.4;
+            }
+        """)
+        search_layout.addWidget(search_text)
+        layout.addWidget(search_group)
+        
+        # 使用说明组
+        usage_group = QGroupBox("使用说明")
+        usage_layout = QVBoxLayout(usage_group)
+        
+        usage_text = QLabel(
+            "• 搜索：支持中文、英文、日文关键词搜索\n"
+            "• 分类：漫画、轻小说等多种类型\n"
+            "• 阅读：点击漫画封面查看详情，点击\"阅读\"按钮开始阅读\n"
+            "• 下载：支持单话下载和批量队列下载\n"
+            "• 章节：支持多话连载漫画的章节管理"
+        )
+        usage_text.setWordWrap(True)
+        usage_text.setStyleSheet("""
+            QLabel {
+                background-color: #e9ecef;
+                border: 1px solid #ced4da;
+                border-radius: 6px;
+                padding: 12px;
+                font-size: 13px;
+                color: #495057;
+                line-height: 1.4;
+            }
+        """)
+        usage_layout.addWidget(usage_text)
+        layout.addWidget(usage_group)
+        
+        layout.addStretch()
+        
+        return page
+    
     def _load_wnacg_domain(self) -> None:
         """加载WNACG当前域名"""
         try:
             if self.wnacg_adapter and hasattr(self.wnacg_adapter, 'api'):
-                if hasattr(self.wnacg_adapter.api.async_source, 'domain') and self.wnacg_adapter.api.async_source.domain:
-                    domain = self.wnacg_adapter.api.async_source.domain
+                if hasattr(self.wnacg_adapter.api, 'domain') and self.wnacg_adapter.api.domain:
+                    domain = self.wnacg_adapter.api.domain
                     self.wnacg_domain_label.setText(domain)
                 else:
                     self.wnacg_domain_label.setText("未初始化")
@@ -817,15 +937,15 @@ class SettingsPage(QWidget):
         
         try:
             # 重新初始化适配器以获取新域名
-            old_domain = getattr(self.wnacg_adapter.api.async_source, 'domain', '未知')
+            old_domain = getattr(self.wnacg_adapter.api, 'domain', '未知')
             
             # 清除当前域名，强制重新获取
-            self.wnacg_adapter.api.async_source.domain = None
+            self.wnacg_adapter.api.domain = None
             
             # 执行一次搜索来触发域名获取
             result = self.wnacg_adapter.search("test", 1)
             
-            new_domain = getattr(self.wnacg_adapter.api.async_source, 'domain', '未知')
+            new_domain = getattr(self.wnacg_adapter.api, 'domain', '未知')
             
             if new_domain and new_domain != old_domain:
                 self.wnacg_domain_label.setText(new_domain)
@@ -1013,177 +1133,80 @@ class SettingsPage(QWidget):
         
         return page
     
-    def _create_tips_page(self) -> QWidget:
-        """创建使用须知页面"""
+    def _create_version_page(self) -> QWidget:
+        """创建版本检测页面"""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
         
-        # 语言切换
-        lang_layout = QHBoxLayout()
-        lang_layout.addStretch()
-        
-        self.tips_lang_label = QLabel("Language / 语言:")
-        self.tips_lang_label.setStyleSheet("color: white; font-weight: bold;")
-        lang_layout.addWidget(self.tips_lang_label)
-        
-        self.tips_language_combo = QComboBox()
-        self.tips_language_combo.addItems(["中文", "English"])
-        self.tips_language_combo.setCurrentIndex(0)
-        self.tips_language_combo.currentTextChanged.connect(self._update_tips_language)
-        self.tips_language_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #2d2d2d;
-                color: #ffffff;
-                border: 1px solid #555555;
-                padding: 5px;
-                border-radius: 3px;
-                min-width: 80px;
-            }
-        """)
-        lang_layout.addWidget(self.tips_language_combo)
-        layout.addLayout(lang_layout)
-        
         # 标题
-        self.tips_title = QLabel("使用须知")
-        self.tips_title.setStyleSheet("font-size: 24px; font-weight: bold; color: white; margin-bottom: 20px;")
-        layout.addWidget(self.tips_title)
+        title = QLabel("版本检测")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; color: white; margin-bottom: 20px;")
+        layout.addWidget(title)
         
-        # 创建滚动区域
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background-color: transparent;
-            }
-            QScrollBar:vertical {
-                background-color: #2d2d2d;
-                width: 12px;
+        # 导入版本管理组件
+        from pancomic.ui.widgets.version_manager import VersionManagerWidget
+        
+        # 创建版本管理器
+        self.version_manager = VersionManagerWidget(
+            repo_owner="WEP-56", 
+            repo_name="PanComic-comiclibrary"
+        )
+        
+        layout.addWidget(self.version_manager)
+        
+        # 使用须知部分（保留原有内容）
+        tips_group = QGroupBox("📋 使用须知")
+        tips_group.setStyleSheet("QGroupBox { font-weight: bold; color: white; }")
+        tips_layout = QVBoxLayout(tips_group)
+        
+        # 使用须知文本
+        tips_text = QTextEdit()
+        tips_text.setReadOnly(True)
+        tips_text.setMaximumHeight(200)
+        tips_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #2d3748;
+                border: 1px solid #4a5568;
                 border-radius: 6px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #555555;
-                border-radius: 6px;
-                min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: #666666;
-            }
-        """)
-        
-        # 内容容器
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setSpacing(25)
-        
-        # 免责声明
-        self.disclaimer_group = QGroupBox()
-        self.disclaimer_group.setStyleSheet("QGroupBox { font-weight: bold; color: white; font-size: 16px; }")
-        disclaimer_layout = QVBoxLayout(self.disclaimer_group)
-        
-        self.disclaimer_text = QLabel()
-        self.disclaimer_text.setWordWrap(True)
-        self.disclaimer_text.setTextFormat(Qt.RichText)
-        self.disclaimer_text.setStyleSheet("""
-            QLabel {
-                color: #cccccc;
-                font-size: 14px;
-                line-height: 1.6;
-                padding: 15px;
-                background-color: #2a2a2a;
-                border-radius: 8px;
-                border-left: 4px solid #ff6b6b;
-            }
-        """)
-        disclaimer_layout.addWidget(self.disclaimer_text)
-        
-        content_layout.addWidget(self.disclaimer_group)
-        
-        # 功能状态
-        self.status_group = QGroupBox()
-        self.status_group.setStyleSheet("QGroupBox { font-weight: bold; color: white; font-size: 16px; }")
-        status_layout = QVBoxLayout(self.status_group)
-        
-        self.status_text = QLabel()
-        self.status_text.setWordWrap(True)
-        self.status_text.setTextFormat(Qt.RichText)
-        self.status_text.setStyleSheet("""
-            QLabel {
-                color: #cccccc;
-                font-size: 14px;
-                line-height: 1.6;
-                padding: 15px;
-                background-color: #2a2a2a;
-                border-radius: 8px;
-                border-left: 4px solid #4ecdc4;
-            }
-        """)
-        status_layout.addWidget(self.status_text)
-        
-        content_layout.addWidget(self.status_group)
-        
-        # 反馈与支持
-        self.feedback_group = QGroupBox()
-        self.feedback_group.setStyleSheet("QGroupBox { font-weight: bold; color: white; font-size: 16px; }")
-        feedback_layout = QVBoxLayout(self.feedback_group)
-        
-        self.feedback_text = QLabel()
-        self.feedback_text.setWordWrap(True)
-        self.feedback_text.setTextFormat(Qt.RichText)
-        self.feedback_text.setStyleSheet("""
-            QLabel {
-                color: #cccccc;
-                font-size: 14px;
-                line-height: 1.6;
-                padding: 15px;
-                background-color: #2a2a2a;
-                border-radius: 8px;
-                border-left: 4px solid #45b7d1;
-            }
-        """)
-        feedback_layout.addWidget(self.feedback_text)
-        
-        content_layout.addWidget(self.feedback_group)
-        
-        # GitHub 链接
-        github_layout = QHBoxLayout()
-        github_layout.addStretch()
-        
-        self.github_button = QPushButton()
-        self.github_button.setFixedSize(200, 40)
-        self.github_button.setStyleSheet("""
-            QPushButton {
-                background-color: #24292e;
+                padding: 12px;
                 color: white;
-                border: 2px solid #444d56;
-                border-radius: 6px;
-                font-weight: bold;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #2f363d;
-                border-color: #586069;
-            }
-            QPushButton:pressed {
-                background-color: #1b1f23;
+                font-family: 'Microsoft YaHei', sans-serif;
             }
         """)
-        self.github_button.clicked.connect(self._open_github)
-        github_layout.addWidget(self.github_button)
-        github_layout.addStretch()
         
-        content_layout.addLayout(github_layout)
-        content_layout.addStretch()
+        # 设置使用须知内容
+        tips_content = """
+🎯 PanComic 使用须知
+
+📖 关于本软件：
+• PanComic 是一个开源的漫画阅读和管理工具
+• 支持多个漫画源的搜索、阅读和下载
+• 所有功能完全免费使用
+
+⚖️ 免责声明：
+• 本软件仅供学习和研究使用
+• 请遵守当地法律法规和版权规定
+• 下载的内容请在24小时内删除
+• 如需长期保存，请购买正版支持作者
+
+🔧 技术支持：
+• 遇到问题请在 GitHub 提交 Issue
+• 欢迎贡献代码和建议
+• 项目地址：https://github.com/WEP-56/PanComic-comiclibrary
+
+📋 版本说明：
+• v0.x.x 为预发行版本，功能可能不稳定
+• v1.0.0+ 为正式版本，功能相对稳定
+• 建议定期检查更新获取最新功能和修复
+        """
         
-        scroll_area.setWidget(content_widget)
-        layout.addWidget(scroll_area)
+        tips_text.setPlainText(tips_content)
+        tips_layout.addWidget(tips_text)
         
-        # 初始化文本内容
-        self._update_tips_content()
+        layout.addWidget(tips_group)
+        layout.addStretch()
         
         return page
     
@@ -1906,6 +1929,10 @@ class SettingsPage(QWidget):
         """导航到WNACG设置页面"""
         self.nav_list.setCurrentRow(3)  # WNACG是第四个项目（索引3）
     
+    def navigate_to_kaobei(self) -> None:
+        """导航到Kaobei设置页面"""
+        self.nav_list.setCurrentRow(4)  # Kaobei是第五个项目（索引4）
+    
     def _clear_cache(self) -> None:
         """清除图片缓存"""
         import shutil
@@ -2042,6 +2069,142 @@ class SettingsPage(QWidget):
         """)
         
         # Content stack - apply to all child widgets
+        self.content_stack.setStyleSheet(f"""
+            QWidget {{
+                background-color: {bg_primary};
+                color: {text_primary};
+            }}
+            
+            QLabel {{
+                color: {text_primary};
+                background: transparent;
+            }}
+            
+            QLineEdit {{
+                background-color: {bg_primary};
+                border: 1px solid {border_color};
+                border-radius: 4px;
+                padding: 8px;
+                color: {text_primary};
+            }}
+            QLineEdit:focus {{
+                border-color: {accent_color};
+            }}
+            
+            QPushButton {{
+                background-color: {accent_color};
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #1084d8;
+            }}
+            QPushButton:disabled {{
+                background-color: {text_muted};
+                color: #a0aec0;
+            }}
+            
+            QGroupBox {{
+                font-weight: bold;
+                border: 1px solid {border_color};
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+                color: {text_primary};
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: {text_primary};
+            }}
+            
+            QCheckBox {{
+                color: {text_primary};
+                spacing: 5px;
+            }}
+            QCheckBox::indicator {{
+                width: 16px;
+                height: 16px;
+                border-radius: 3px;
+                border: 1px solid {border_color};
+                background-color: {bg_primary};
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {accent_color};
+                border: 1px solid {accent_color};
+            }}
+            
+            QComboBox {{
+                background-color: {bg_primary};
+                border: 1px solid {border_color};
+                border-radius: 4px;
+                padding: 8px;
+                color: {text_primary};
+            }}
+            QComboBox:hover {{
+                border-color: {accent_color};
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {bg_secondary};
+                border: 1px solid {border_color};
+                selection-background-color: {accent_color};
+                color: {text_primary};
+            }}
+        """)
+        
+        # Apply specific styles to comic source settings
+        self._apply_comic_source_theme(theme, bg_primary, bg_secondary, text_primary, text_secondary, text_muted, border_color, accent_color)
+    
+    def _apply_comic_source_theme(self, theme: str, bg_primary: str, bg_secondary: str, text_primary: str, text_secondary: str, text_muted: str, border_color: str, accent_color: str):
+        """Apply theme to comic source settings pages"""
+        # WNACG domain label
+        if hasattr(self, 'wnacg_domain_label'):
+            self.wnacg_domain_label.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {bg_secondary};
+                    border: 1px solid {border_color};
+                    border-radius: 4px;
+                    padding: 8px;
+                    color: {text_primary};
+                    font-family: monospace;
+                }}
+            """)
+        
+        # WNACG domain status
+        if hasattr(self, 'wnacg_domain_status'):
+            self.wnacg_domain_status.setStyleSheet(f"color: {text_muted}; font-size: 12px; margin: 5px 0;")
+        
+        # Kaobei domain labels
+        if hasattr(self, 'kaobei_api_domain_label'):
+            self.kaobei_api_domain_label.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {bg_secondary};
+                    border: 1px solid {border_color};
+                    border-radius: 4px;
+                    padding: 8px;
+                    color: {text_primary};
+                    font-family: monospace;
+                }}
+            """)
+        
+        if hasattr(self, 'kaobei_pc_domain_label'):
+            self.kaobei_pc_domain_label.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {bg_secondary};
+                    border: 1px solid {border_color};
+                    border-radius: 4px;
+                    padding: 8px;
+                    color: {text_primary};
+                    font-family: monospace;
+                }}
+            """)
+        
+        if hasattr(self, 'kaobei_domain_status'):
+            self.kaobei_domain_status.setStyleSheet(f"color: {text_muted}; font-size: 12px; margin: 5px 0;")
         self.content_stack.setStyleSheet(f"""
             QStackedWidget {{
                 background-color: {bg_primary};

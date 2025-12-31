@@ -32,6 +32,7 @@ class SourceSelectorDialog(QDialog):
         super().__init__(parent)
         self.available_sources = available_sources
         self.added_sources = added_sources
+        self._current_theme = 'dark'  # 默认深色主题
         self._setup_ui()
     
     def _setup_ui(self):
@@ -44,29 +45,13 @@ class SourceSelectorDialog(QDialog):
         layout.setSpacing(12)
         
         # 标题
-        title = QLabel("选择要添加的漫画源")
-        title.setStyleSheet("font-size: 16px; font-weight: bold;")
-        layout.addWidget(title)
+        self.title_label = QLabel("选择要添加的漫画源")
+        self.title_label.setObjectName("titleLabel")
+        layout.addWidget(self.title_label)
         
         # 漫画源列表
         self.list_widget = QListWidget()
-        self.list_widget.setStyleSheet("""
-            QListWidget {
-                background-color: #2b2b2b;
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
-            }
-            QListWidget::item {
-                padding: 12px;
-                border-bottom: 1px solid #3a3a3a;
-            }
-            QListWidget::item:hover {
-                background-color: #3a3a3a;
-            }
-            QListWidget::item:selected {
-                background-color: #0078d4;
-            }
-        """)
+        self.list_widget.setObjectName("sourceList")
         
         for source in self.available_sources:
             item = QListWidgetItem()
@@ -90,51 +75,136 @@ class SourceSelectorDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
         
-        cancel_btn = QPushButton("取消")
-        cancel_btn.clicked.connect(self.reject)
-        cancel_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #3a3a3a;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 20px;
-            }
-            QPushButton:hover {
-                background-color: #4a4a4a;
-            }
-        """)
+        self.cancel_btn = QPushButton("取消")
+        self.cancel_btn.clicked.connect(self.reject)
+        self.cancel_btn.setObjectName("cancelButton")
         
-        add_btn = QPushButton("添加")
-        add_btn.clicked.connect(self._on_add_clicked)
-        add_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #0078d4;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 20px;
-            }
-            QPushButton:hover {
-                background-color: #1084d8;
-            }
-        """)
+        self.add_btn = QPushButton("添加")
+        self.add_btn.clicked.connect(self._on_add_clicked)
+        self.add_btn.setObjectName("addButton")
         
         btn_layout.addStretch()
-        btn_layout.addWidget(cancel_btn)
-        btn_layout.addWidget(add_btn)
+        btn_layout.addWidget(self.cancel_btn)
+        btn_layout.addWidget(self.add_btn)
         layout.addLayout(btn_layout)
         
-        # 对话框样式
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #1e1e1e;
+        # 应用默认主题
+        self.apply_theme('dark')
+    
+    def apply_theme(self, theme: str):
+        """应用主题到对话框"""
+        self._current_theme = theme
+        
+        if theme == 'light':
+            # 浅色主题配色
+            bg_primary = '#FFFFFF'
+            bg_secondary = '#F5F5F5'
+            text_primary = '#000000'
+            text_secondary = '#333333'
+            text_muted = '#666666'
+            border_color = '#E0E0E0'
+            accent_color = '#0078D4'
+            item_hover = '#F0F0F0'
+            item_selected = '#0078D4'
+            disabled_text = '#999999'
+            cancel_bg = '#E8E8E8'
+            cancel_hover = '#D0D0D0'
+        else:
+            # 深色主题配色
+            bg_primary = '#1e1e1e'
+            bg_secondary = '#2b2b2b'
+            text_primary = '#ffffff'
+            text_secondary = '#cccccc'
+            text_muted = '#888888'
+            border_color = '#3a3a3a'
+            accent_color = '#0078d4'
+            item_hover = '#3a3a3a'
+            item_selected = '#0078d4'
+            disabled_text = '#666666'
+            cancel_bg = '#3a3a3a'
+            cancel_hover = '#4a4a4a'
+        
+        # 应用样式
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {bg_primary};
+                color: {text_primary};
+            }}
+            
+            #titleLabel {{
+                color: {text_primary};
+                font-size: 16px;
+                font-weight: bold;
+            }}
+            
+            #sourceList {{
+                background-color: {bg_secondary};
+                border: 1px solid {border_color};
+                border-radius: 8px;
+                color: {text_primary};
+            }}
+            
+            #sourceList::item {{
+                padding: 12px;
+                border-bottom: 1px solid {border_color};
+                color: {text_primary};
+            }}
+            
+            #sourceList::item:hover {{
+                background-color: {item_hover};
+            }}
+            
+            #sourceList::item:selected {{
+                background-color: {item_selected};
                 color: white;
-            }
-            QLabel {
+            }}
+            
+            #sourceList::item:disabled {{
+                color: {disabled_text};
+                background-color: transparent;
+            }}
+            
+            #cancelButton {{
+                background-color: {cancel_bg};
+                color: {text_primary};
+                border: 1px solid {border_color};
+                border-radius: 6px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }}
+            
+            #cancelButton:hover {{
+                background-color: {cancel_hover};
+                border-color: {accent_color};
+            }}
+            
+            #addButton {{
+                background-color: {accent_color};
                 color: white;
-            }
+                border: none;
+                border-radius: 6px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }}
+            
+            #addButton:hover {{
+                background-color: #1084d8;
+            }}
+            
+            #addButton:pressed {{
+                background-color: #006cbd;
+            }}
         """)
+    
+    def showEvent(self, event):
+        """对话框显示时应用父窗口的主题"""
+        super().showEvent(event)
+        # 尝试从父窗口获取当前主题
+        if self.parent() and hasattr(self.parent(), '_current_theme'):
+            self.apply_theme(self.parent()._current_theme)
+        elif self.parent() and hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), '_current_theme'):
+            # 如果父窗口的父窗口有主题设置
+            self.apply_theme(self.parent().parent()._current_theme)
     
     def _on_item_double_clicked(self, item: QListWidgetItem):
         if item.flags() & Qt.ItemIsEnabled:
@@ -176,12 +246,15 @@ class DynamicTabBar(QWidget):
         # 固定标签
         self.fixed_tabs = [
             {"key": "library", "name": "资源库"},
-            {"key": "download", "name": "下载管理"},
+            {"key": "download", "name": "漫画下载"},
             {"key": "settings", "name": "设置"}
         ]
         
         # 当前选中的标签 key
         self.current_tab: Optional[str] = None
+        
+        # 当前主题
+        self._current_theme: str = 'dark'
         
         # UI 组件
         self._tab_buttons: Dict[str, QToolButton] = {}
@@ -203,21 +276,9 @@ class DynamicTabBar(QWidget):
         self.add_btn = QToolButton()
         self.add_btn.setText("+")
         self.add_btn.setFixedSize(36, 36)
+        self.add_btn.setObjectName("add_button")  # 设置对象名称用于样式选择
         self.add_btn.clicked.connect(self._on_add_clicked)
-        self.add_btn.setStyleSheet("""
-            QToolButton {
-                background-color: #2b2b2b;
-                color: #888;
-                border: none;
-                border-radius: 4px;
-                font-size: 18px;
-                font-weight: bold;
-            }
-            QToolButton:hover {
-                background-color: #3a3a3a;
-                color: white;
-            }
-        """)
+        # 移除硬编码样式，使用apply_theme控制
         self.dynamic_layout.addWidget(self.add_btn)
         
         layout.addWidget(self.dynamic_area)
@@ -357,6 +418,8 @@ class DynamicTabBar(QWidget):
         """点击添加按钮"""
         added_keys = [t["key"] for t in self.dynamic_tabs]
         dialog = SourceSelectorDialog(self.available_sources, added_keys, self)
+        # 应用当前主题到对话框
+        dialog.apply_theme(self._current_theme)
         dialog.source_selected.connect(self._on_source_selected)
         dialog.exec()
     
@@ -375,21 +438,40 @@ class DynamicTabBar(QWidget):
             return
         
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #2b2b2b;
-                color: white;
-                border: 1px solid #3a3a3a;
+        
+        # 根据当前主题设置菜单样式
+        if self._current_theme == 'light':
+            menu_bg = '#FFFFFF'
+            menu_text = '#000000'
+            menu_border = '#E0E0E0'
+            menu_hover = '#F0F0F0'
+            menu_selected = '#0078D4'
+        else:
+            menu_bg = '#2b2b2b'
+            menu_text = '#ffffff'
+            menu_border = '#3a3a3a'
+            menu_hover = '#3a3a3a'
+            menu_selected = '#0078d4'
+        
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {menu_bg};
+                color: {menu_text};
+                border: 1px solid {menu_border};
                 border-radius: 4px;
                 padding: 4px;
-            }
-            QMenu::item {
+            }}
+            QMenu::item {{
                 padding: 8px 24px;
                 border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #0078d4;
-            }
+            }}
+            QMenu::item:hover {{
+                background-color: {menu_hover};
+            }}
+            QMenu::item:selected {{
+                background-color: {menu_selected};
+                color: white;
+            }}
         """)
         
         closable = btn.property("closable")
@@ -438,3 +520,95 @@ class DynamicTabBar(QWidget):
         self.dynamic_layout.insertWidget(target_index, btn)
         
         self.tabs_reordered.emit([t["key"] for t in self.dynamic_tabs])
+    
+    def apply_theme(self, theme: str):
+        """应用主题到标签栏组件"""
+        self._current_theme = theme  # 保存当前主题
+        
+        if theme == 'light':
+            # 浅色主题配色
+            bg_primary = '#FFFFFF'
+            bg_secondary = '#F5F5F5'
+            text_primary = '#000000'
+            text_secondary = '#666666'
+            border_color = '#E0E0E0'
+            accent_color = '#0078D4'
+            button_bg = '#E8E8E8'      # 浅灰色按钮背景
+            button_hover = '#D0D0D0'   # 悬停时更深的灰色
+            button_active = '#0078D4'  # 选中时蓝色
+            add_button_bg = '#E8E8E8'  # 添加按钮背景
+            add_button_text = '#666666'  # 添加按钮文字颜色
+            add_button_hover_bg = '#D0D0D0'
+            add_button_hover_text = '#333333'
+        else:
+            # 深色主题配色
+            bg_primary = '#1e1e1e'
+            bg_secondary = '#2b2b2b'
+            text_primary = '#ffffff'
+            text_secondary = '#cccccc'
+            border_color = '#3a3a3a'
+            accent_color = '#0078d4'
+            button_bg = '#2b2b2b'
+            button_hover = '#3a3a3a'
+            button_active = '#0078d4'
+            add_button_bg = '#2b2b2b'
+            add_button_text = '#888888'
+            add_button_hover_bg = '#3a3a3a'
+            add_button_hover_text = '#ffffff'
+        
+        # 应用标签栏样式
+        self.setStyleSheet(f"""
+            DynamicTabBar {{
+                background-color: {bg_primary};
+                border-bottom: 1px solid {border_color};
+            }}
+            
+            QToolButton {{
+                background-color: {button_bg};
+                color: {text_primary};
+                border: 1px solid {border_color};
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 14px;
+                font-weight: bold;
+                margin: 2px;
+            }}
+            
+            QToolButton:hover {{
+                background-color: {button_hover};
+                border-color: {accent_color};
+            }}
+            
+            QToolButton:checked {{
+                background-color: {button_active};
+                color: white;
+                border-color: {button_active};
+            }}
+            
+            QToolButton:pressed {{
+                background-color: {accent_color};
+                color: white;
+            }}
+            
+            /* 添加按钮特殊样式 */
+            QToolButton#add_button {{
+                background-color: {add_button_bg};
+                color: {add_button_text};
+                border: 1px solid {border_color};
+                border-radius: 4px;
+                font-size: 18px;
+                font-weight: bold;
+                padding: 6px;
+            }}
+            
+            QToolButton#add_button:hover {{
+                background-color: {add_button_hover_bg};
+                color: {add_button_hover_text};
+                border-color: {accent_color};
+            }}
+            
+            QToolButton#add_button:pressed {{
+                background-color: {accent_color};
+                color: white;
+            }}
+        """)

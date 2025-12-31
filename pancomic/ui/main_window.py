@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QStackedWidget
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent, QIcon
 
 from pancomic.ui.widgets.dynamic_tab_bar import DynamicTabBar
 from pancomic.ui.widgets.source_tab_manager import SourceTabManager
@@ -13,6 +13,7 @@ from pancomic.ui.pages.jmcomic_page import JMComicPage
 from pancomic.ui.pages.ehentai_page import EHentaiPage
 from pancomic.ui.pages.picacg_page import PicACGPage
 from pancomic.ui.pages.wnacg_page import WNACGPage
+from pancomic.ui.pages.kaobei_page_simple_optimized import OptimizedKaobeiPage
 from pancomic.ui.pages.anime_search_page import AnimeSearchPage
 from pancomic.ui.pages.library_page import LibraryPage
 from pancomic.ui.pages.download_page import DownloadPage
@@ -21,7 +22,7 @@ from pancomic.adapters.jmcomic_adapter import JMComicAdapter
 from pancomic.adapters.ehentai_adapter import EHentaiAdapter
 from pancomic.adapters.picacg_adapter import PicACGAdapter
 from pancomic.adapters.wnacg_adapter import WNACGAdapter
-from pancomic.adapters.wnacg_adapter import WNACGAdapter
+from pancomic.adapters.kaobei_adapter import KaobeiAdapter
 from pancomic.core.config_manager import ConfigManager
 from pancomic.infrastructure.download_manager import DownloadManager
 
@@ -46,6 +47,7 @@ class MainWindow(QMainWindow):
         ehentai_adapter: EHentaiAdapter,
         picacg_adapter: PicACGAdapter,
         wnacg_adapter: WNACGAdapter,
+        kaobei_adapter: KaobeiAdapter,
         download_manager: DownloadManager,
         parent: Optional[QWidget] = None
     ):
@@ -56,6 +58,7 @@ class MainWindow(QMainWindow):
         self.ehentai_adapter = ehentai_adapter
         self.picacg_adapter = picacg_adapter
         self.wnacg_adapter = wnacg_adapter
+        self.kaobei_adapter = kaobei_adapter
         self.download_manager = download_manager
         
         # Tab management
@@ -82,6 +85,15 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         """Initialize UI components."""
         self.setWindowTitle("PanComic")
+        
+        # Set application icon
+        try:
+            from pathlib import Path
+            icon_path = Path(__file__).parent.parent / "resources" / "icons" / "iicc.ico"
+            if icon_path.exists():
+                self.setWindowIcon(QIcon(str(icon_path)))
+        except Exception as e:
+            print(f"Failed to load window icon: {e}")
         
         window_width = self.config_manager.get('general.window_size.width', 1400)
         window_height = self.config_manager.get('general.window_size.height', 900)
@@ -136,6 +148,12 @@ class MainWindow(QMainWindow):
             lambda: self._create_wnacg_page()
         )
         
+        # Kaobei (拷贝漫画)
+        self.tab_manager.register_source(
+            "kaobei", "拷贝漫画",
+            lambda: self._create_kaobei_page()
+        )
+        
         # Anime Search
         self.tab_manager.register_source(
             "anime", "动漫搜索",
@@ -165,7 +183,7 @@ class MainWindow(QMainWindow):
         # Downloads
         self.download_page = DownloadPage(self.download_manager)
         self.download_page.start_download_requested.connect(self._on_queue_start_download)
-        self.tab_manager.register_fixed_page("download", "下载管理", self.download_page)
+        self.tab_manager.register_fixed_page("download", "漫画下载", self.download_page)
         
         # Settings
         self.settings_page = SettingsPage(
@@ -174,6 +192,7 @@ class MainWindow(QMainWindow):
             jmcomic_adapter=self.jmcomic_adapter,
             ehentai_adapter=self.ehentai_adapter,
             wnacg_adapter=self.wnacg_adapter,
+            kaobei_adapter=self.kaobei_adapter,
             parent=self
         )
         self.settings_page.settings_saved.connect(self._on_settings_saved)
@@ -236,6 +255,15 @@ class MainWindow(QMainWindow):
         page.settings_requested.connect(self._navigate_to_wnacg_settings)
         return page
     
+    def _create_kaobei_page(self) -> OptimizedKaobeiPage:
+        """Create optimized Kaobei page."""
+        page = OptimizedKaobeiPage(self.kaobei_adapter, self.download_manager)
+        page.read_requested.connect(self._on_read_requested)
+        page.download_requested.connect(self._on_download_requested)
+        page.queue_requested.connect(self._on_queue_requested)
+        page.settings_requested.connect(self._navigate_to_kaobei_settings)
+        return page
+    
     def _create_anime_page(self) -> AnimeSearchPage:
         """Create Anime search page."""
         page = AnimeSearchPage()
@@ -259,8 +287,26 @@ class MainWindow(QMainWindow):
     
     def _on_tab_closed(self, key: str):
         """Handle tab close."""
-        self.tab_manager.remove_page(key)
-        self._save_tabs_config()
+        try:
+            print(f"🔄 处理标签关闭: {key}")
+            self.tab_manager.remove_page(key)
+            self._save_tabs_config()
+            print(f"✅ 标签关闭完成: {key}")
+        except Exception as e:
+            print(f"❌ 关闭标签时出错 {key}: {e}")
+            # 即使出错也要保存配置，防止配置不一致
+            try:
+                self._save_tabs_config()
+            except Exception as save_error:
+                print(f"❌ 保存配置时出错: {save_error}")
+            
+            # 显示错误消息但不让程序崩溃
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, 
+                "标签关闭错误", 
+                f"关闭标签 '{key}' 时出现错误:\n{str(e)}\n\n程序将继续运行。"
+            )
     
     def _on_tab_added(self, key: str):
         """Handle tab added."""
@@ -291,7 +337,7 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
         file_menu = menubar.addMenu("PanComic")
         
-        download_action = QAction("下载管理", self)
+        download_action = QAction("漫画下载", self)
         download_action.setShortcut("Ctrl+D")
         download_action.triggered.connect(lambda: self.tab_bar.select_tab("download"))
         file_menu.addAction(download_action)
@@ -387,6 +433,8 @@ class MainWindow(QMainWindow):
             adapter = self.picacg_adapter
         elif comic.source == "wnacg":
             adapter = self.wnacg_adapter
+        elif comic.source == "kaobei":
+            adapter = self.kaobei_adapter
         
         if not adapter:
             from PySide6.QtWidgets import QMessageBox
@@ -448,33 +496,37 @@ class MainWindow(QMainWindow):
         from pancomic.models.comic import Comic
         from pancomic.models.chapter import Chapter
         
+        # 从嵌套结构中提取comic数据
+        comic_data = item_data.get('comic', {})
+        
         comic = Comic(
-            id=str(item_data['comic_id']),
-            title=item_data.get('comic_title', '未知标题'),
-            author=item_data.get('comic_author', '未知作者'),
-            cover_url=item_data.get('comic_cover_url', ''),
-            description=item_data.get('description'),
-            tags=item_data.get('tags', []),
-            categories=item_data.get('categories', []),
-            status=item_data.get('status', 'completed'),
-            chapter_count=item_data.get('chapter_count', 0),
-            view_count=item_data.get('view_count', 0),
-            like_count=item_data.get('like_count', 0),
-            is_favorite=item_data.get('is_favorite', False),
-            source=item_data['source']
+            id=str(comic_data.get('id', '')),
+            title=comic_data.get('title', '未知标题'),
+            author=comic_data.get('author', '未知作者'),
+            cover_url=comic_data.get('cover_url', ''),
+            description=comic_data.get('description', ''),
+            tags=comic_data.get('tags', []),
+            categories=comic_data.get('categories', []),
+            status=comic_data.get('status', 'completed'),
+            chapter_count=comic_data.get('chapter_count', 0),
+            view_count=comic_data.get('view_count', 0),
+            like_count=comic_data.get('like_count', 0),
+            is_favorite=comic_data.get('is_favorite', False),
+            source=comic_data.get('source', 'unknown')
         )
         
+        # 重建章节列表
         chapters = []
-        for ch_data in item_data['chapters_data']:
+        for chapter_data in item_data.get('chapters', []):
             chapter = Chapter(
-                id=ch_data['id'],
-                comic_id=item_data['comic_id'],
-                title=ch_data['title'],
-                chapter_number=ch_data['chapter_number'],
-                page_count=ch_data.get('page_count', 0),
+                id=chapter_data.get('id', ''),
+                comic_id=comic.id,
+                title=chapter_data.get('title', ''),
+                chapter_number=chapter_data.get('chapter_number', 0),
+                page_count=chapter_data.get('page_count', 0),
                 is_downloaded=False,
                 download_path=None,
-                source=item_data['source']
+                source=comic.source
             )
             chapters.append(chapter)
         
@@ -520,6 +572,12 @@ class MainWindow(QMainWindow):
         if self.settings_page:
             self.settings_page.navigate_to_wnacg()
     
+    def _navigate_to_kaobei_settings(self):
+        """Navigate to Kaobei settings."""
+        self.tab_bar.select_tab("settings")
+        if self.settings_page:
+            self.settings_page.navigate_to_kaobei()
+    
     def _on_anime_added_to_history(self, anime):
         """Handle anime added to history."""
         if self.library_page:
@@ -553,6 +611,10 @@ class MainWindow(QMainWindow):
                             page = self.tab_manager.get_page(key)
                             if page and hasattr(page, 'apply_theme'):
                                 page.apply_theme(theme)
+                
+                # Apply to tab bar
+                if hasattr(self.tab_bar, 'apply_theme'):
+                    self.tab_bar.apply_theme(theme)
                 
                 self._apply_theme_to_main_ui(theme)
             except Exception as e:

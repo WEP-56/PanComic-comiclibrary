@@ -16,7 +16,7 @@ from pancomic.adapters.jmcomic_adapter import JMComicAdapter
 from pancomic.adapters.ehentai_adapter import EHentaiAdapter
 from pancomic.adapters.picacg_adapter import PicACGAdapter
 from pancomic.adapters.wnacg_adapter import WNACGAdapter
-from pancomic.adapters.wnacg_adapter import WNACGAdapter
+from pancomic.adapters.kaobei_adapter import KaobeiAdapter
 from pancomic.ui.main_window import MainWindow
 
 
@@ -63,6 +63,7 @@ class Application:
         self.ehentai_adapter: Optional[EHentaiAdapter] = None
         self.picacg_adapter: Optional[PicACGAdapter] = None
         self.wnacg_adapter: Optional[WNACGAdapter] = None
+        self.kaobei_adapter: Optional[KaobeiAdapter] = None
         
         # Main window
         self.main_window: Optional[MainWindow] = None
@@ -154,6 +155,7 @@ class Application:
                 ehentai_adapter=self.ehentai_adapter,
                 picacg_adapter=self.picacg_adapter,
                 wnacg_adapter=self.wnacg_adapter,
+                kaobei_adapter=self.kaobei_adapter,
                 download_manager=self.download_manager
             )
             
@@ -249,6 +251,11 @@ class Application:
                 "enabled": True,
                 "domain": "",
                 "auto_domain_discovery": True
+            },
+            "kaobei": {
+                "enabled": True,
+                "domain": "api.2025copy.com",
+                "pc_domain": "www.2025copy.com"
             }
         }
         
@@ -260,23 +267,50 @@ class Application:
     
     def _initialize_adapters(self) -> None:
         """Initialize all source adapters."""
-        # Get source configurations
-        jmcomic_config = self.config_manager.get_source_config('jmcomic')
-        ehentai_config = self.config_manager.get_source_config('ehentai')
-        picacg_config = self.config_manager.get_source_config('picacg')
-        wnacg_config = self.config_manager.get_source_config('wnacg')
+        # Get source configurations with fallback
+        try:
+            jmcomic_config = self.config_manager.get_source_config('jmcomic')
+        except KeyError:
+            Logger.warning("JMComic configuration not found, using defaults")
+            jmcomic_config = {"username": "", "password": "", "auto_login": False, "api_endpoint": 2, "proxy": {"enabled": False, "address": "", "port": 1080}}
+        
+        try:
+            ehentai_config = self.config_manager.get_source_config('ehentai')
+        except KeyError:
+            Logger.warning("E-Hentai configuration not found, using defaults")
+            ehentai_config = {"enabled": False, "auto_login": False, "cookies": "", "use_exhentai": False, "proxy": {"enabled": False, "address": "", "port": 1080}}
+        
+        try:
+            picacg_config = self.config_manager.get_source_config('picacg')
+        except KeyError:
+            Logger.warning("PicACG configuration not found, using defaults")
+            picacg_config = {"email": "", "password": "", "auto_login": False, "endpoint": "https://picaapi.picacomic.com", "image_server": "storage.diwodiwo.xyz", "image_quality": "original"}
+        
+        try:
+            wnacg_config = self.config_manager.get_source_config('wnacg')
+        except KeyError:
+            Logger.warning("WNACG configuration not found, using defaults")
+            wnacg_config = {"enabled": True, "domain": "", "auto_domain_discovery": True}
+        
+        try:
+            kaobei_config = self.config_manager.get_source_config('kaobei')
+        except KeyError:
+            Logger.warning("Kaobei configuration not found, using defaults")
+            kaobei_config = {"enabled": True, "domain": "api.2025copy.com", "pc_domain": "www.2025copy.com"}
         
         # Create adapters
         self.jmcomic_adapter = JMComicAdapter(jmcomic_config)
         self.ehentai_adapter = EHentaiAdapter(ehentai_config)
         self.picacg_adapter = PicACGAdapter(picacg_config)
         self.wnacg_adapter = WNACGAdapter(wnacg_config)
+        self.kaobei_adapter = KaobeiAdapter(kaobei_config)
         
         # Start worker threads
         self.jmcomic_adapter.start_worker_thread()
         self.ehentai_adapter.start_worker_thread()
         self.picacg_adapter.start_worker_thread()
         self.wnacg_adapter.start_worker_thread()
+        self.kaobei_adapter.start_worker_thread()
         
         # Initialize adapters
         try:
@@ -303,10 +337,17 @@ class Application:
         except Exception as e:
             Logger.error(f"Failed to initialize WNACG adapter: {e}")
         
+        try:
+            self.kaobei_adapter.initialize()
+            Logger.info("Kaobei adapter initialized")
+        except Exception as e:
+            Logger.error(f"Failed to initialize Kaobei adapter: {e}")
+        
         # Register download functions
         self.download_manager.register_download_function('jmcomic', self.jmcomic_adapter.download_chapter)
         self.download_manager.register_download_function('picacg', self.picacg_adapter.download_chapter)
         self.download_manager.register_download_function('wnacg', self.wnacg_adapter.download_chapter)
+        self.download_manager.register_download_function('kaobei', self.kaobei_adapter.download_chapter)
         # Note: EHentai download function is disabled
         
         Logger.info("Source adapters initialized and download functions registered")

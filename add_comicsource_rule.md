@@ -27,7 +27,7 @@
 - [ ] 更新 `pancomic/models/comic.py` 和 `chapter.py` 的 valid_sources
 - [ ] 在 `SourceTabManager` 中注册新源
 
-### 第四阶段: UI 开发
+### 第四阶段: UI 开发（关键点：3线程。1：爬虫线程。2：解析线程。3.分块渲染线程（不要等所有数据全部解析完才给ui，而是每解析20条，就立即发送给ui渲染，如果用户重新搜索或关闭标签页，一定要停止分块渲染定时器，否则旧的搜索结果可能会一直出现）
 - [ ] 创建 `pancomic/ui/pages/{source_name}_page.py` - 页面UI
 - [ ] 遵循分割式布局规范 (5:3 比例)
 - [ ] 实现异步搜索工作线程
